@@ -1,0 +1,17 @@
+cookie:
+  expiry_days: 30
+  key: some_signature_key
+  name: some_cookie_name
+credentials:
+  usernames:
+    admin:
+      email: admin@example.com
+      name: 管理者
+      password: $2b$12$47JSRwAwYgUZj.S73q2ZwO9zJRlSj8eZtcy4vJwUMVgsN/N4OxZee
+    user:
+      email: user@example.com
+      name: ユーザー
+      password: $2b$12$NeQ1XUDrBO1oxBWq2VHHpOwWFpJjgPhj5ph9t7DUWrJN2G8jwt9TC
+preauthorized:
+  emails:
+  - admin@example.com
