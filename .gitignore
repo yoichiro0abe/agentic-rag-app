@@ -6,6 +6,7 @@ tmp/
 # C extensions
 *.so
 #
+/data/*
 *.txt
 data.csv
 *.data

@@ -151,25 +151,7 @@ def setup_authentication():
         config["cookie"]["key"],
         config["cookie"]["expiry_days"],
     )
-
-    # ログイン
-    authenticator.login(location="main")
-
     return authenticator
-
-
-def show_login_info():
-    """ログイン情報の表示"""
-    st.markdown(
-        """
-    <div class='custom-info'>
-        <h3>📋 デフォルトのログイン情報</h3>
-        <p><strong>管理者:</strong> ユーザー名: admin, パスワード: 123456</p>
-        <p><strong>一般ユーザー:</strong> ユーザー名: user, パスワード: abc123</p>
-    </div>
-    """,
-        unsafe_allow_html=True,
-    )
 
 
 def show_welcome_message():
@@ -183,13 +165,6 @@ def show_welcome_message():
     """,
         unsafe_allow_html=True,
     )
-
-
-def logout():
-    """ログアウト処理"""
-    for key in list(st.session_state.keys()):
-        del st.session_state[key]
-    st.rerun()
 
 
 def initialize_managers():

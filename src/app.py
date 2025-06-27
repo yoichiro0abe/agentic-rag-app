@@ -9,12 +9,10 @@ if current_dir not in sys.path:
 
 from common import (
     setup_authentication,
-    show_login_info,
     show_welcome_message,
     display_statistics,
     initialize_managers,
     apply_custom_styles,
-    logout,
 )
 
 # ページ設定
@@ -38,12 +36,13 @@ def main():
     authenticator = setup_authentication()
 
     # 認証状態の確認
-    if st.session_state.get("authentication_status") is False:
-        st.error("ユーザー名またはパスワードが正しくありません")
-    elif st.session_state.get("authentication_status") is None:
-        st.warning("ユーザー名とパスワードを入力してください")
-        show_login_info()
-    elif st.session_state.get("authentication_status"):
+    auth_status = st.session_state.get("authentication_status", False)
+    if auth_status is not True:
+        st.error("ユーザー名とパスワードを入力してください")
+        # ログイン UI を表示（引数は setup_authentication の実装に合わせてください）
+        authenticator.login("main")
+        return
+    else:
         # ログイン成功時の処理
         show_welcome_message()
 
@@ -54,7 +53,8 @@ def main():
             st.markdown("---")
 
             if st.button("🚪 ログアウト", use_container_width=True):
-                logout()
+                # 認証ステータスをクリアして再実行
+                st.logout()
 
         # 統計情報を表示
         display_statistics()  # ページナビゲーションの設定（絶対パスを使用）
