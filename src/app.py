@@ -39,9 +39,15 @@ def main():
     auth_status = st.session_state.get("authentication_status", False)
     if auth_status is not True:
         st.error("ユーザー名とパスワードを入力してください")
-        # ログイン UI を表示（引数は setup_authentication の実装に合わせてください）
-        authenticator.login("main")
-        return
+        # ログイン UI を表示し、戻り値を受け取ってセッションに保存
+        name, authentication_status, username = authenticator.login("main")
+        if authentication_status:
+            st.session_state["name"] = name
+            st.session_state["authentication_status"] = authentication_status
+            st.session_state["username"] = username
+            st.rerun()
+        else:
+            return
     else:
         # ログイン成功時の処理
         show_welcome_message()
@@ -60,21 +66,21 @@ def main():
         display_statistics()  # ページナビゲーションの設定（絶対パスを使用）
         pages_dir = os.path.join(current_dir, "pages")
         chatbot_page = st.Page(
-            os.path.join(pages_dir, "chatbot_page.py"),
+            os.path.join(pages_dir, "1_chatbot_page.py"),
             title="チャットボット",
             icon="🤖",
             default=True,
         )
         analysis_page = st.Page(
-            os.path.join(pages_dir, "analysis_page.py"), title="分析ボット", icon="📊"
+            os.path.join(pages_dir, "2_analysis_page.py"), title="分析ボット", icon="📊"
         )
         chat_history_page = st.Page(
-            os.path.join(pages_dir, "chat_history_page.py"),
+            os.path.join(pages_dir, "3_chat_history_page.py"),
             title="チャット履歴",
             icon="💬",
         )
         prompt_library_page = st.Page(
-            os.path.join(pages_dir, "prompt_library_page.py"),
+            os.path.join(pages_dir, "4_prompt_library_page.py"),
             title="プロンプトライブラリ",
             icon="📚",
         )  # ナビゲーションの設定
