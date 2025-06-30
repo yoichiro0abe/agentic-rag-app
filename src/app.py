@@ -9,7 +9,6 @@ if current_dir not in sys.path:
 
 from common import (
     setup_authentication,
-    show_welcome_message,
     display_statistics,
     initialize_managers,
     apply_custom_styles,
@@ -38,29 +37,63 @@ def main():
     # 認証状態の確認
     auth_status = st.session_state.get("authentication_status", False)
     if auth_status is not True:
-        st.error("ユーザー名とパスワードを入力してください")
+        # ログイン画面では、サイドバーを非表示にする
+        st.markdown(
+            """
+            <style>
+                .css-1d391kg {display: none}
+                .css-1rs6os {display: none}
+                section[data-testid="stSidebar"] {display: none}
+                .stSidebar {display: none}
+            </style>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        # ログインページのタイトルとメッセージを中央に配置
+        st.markdown(
+            """
+            <div style="text-align: center; padding: 2rem 0;">
+                <h1>🤖 チャットボットアプリ</h1>
+                <p>ログインしてご利用ください</p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
         # ログイン UI を表示し、戻り値を受け取ってセッションに保存
-        name, authentication_status, username = authenticator.login("main")
-        if authentication_status:
-            st.session_state["name"] = name
-            st.session_state["authentication_status"] = authentication_status
-            st.session_state["username"] = username
-            st.rerun()
+        login_result = authenticator.login("main")
+
+        # login() の戻り値がNoneでないことを確認
+        if login_result is not None:
+            name, authentication_status, username = login_result
+
+            # 認証が成功した場合
+            if authentication_status:
+                st.session_state["name"] = name
+                st.session_state["authentication_status"] = authentication_status
+                st.session_state["username"] = username
+                st.rerun()
+            elif authentication_status is False:
+                st.error("🚫 ユーザー名またはパスワードが正しくありません")
+                st.info("💡 再度ログイン情報を入力してください")
+                # セッション状態をクリアしてログインページに戻る
+                if "authentication_status" in st.session_state:
+                    del st.session_state["authentication_status"]
+                if "name" in st.session_state:
+                    del st.session_state["name"]
+                if "username" in st.session_state:
+                    del st.session_state["username"]
+                st.rerun()
         else:
+            # login()がNoneを返した場合（通常は初回表示時）
             return
     else:
-        # ログイン成功時の処理
-        show_welcome_message()
-
         # サイドバーにログアウトボタンを追加
         with st.sidebar:
-            st.title("🤖 チャットボットアプリ")
-            st.write(f"ようこそ, {st.session_state['name']}さん！")
-            st.markdown("---")
-
             if st.button("🚪 ログアウト", use_container_width=True):
-                # 認証ステータスをクリアして再実行
-                st.logout()
+                authenticator.logout("ログアウト", "sidebar")
+                st.rerun()
 
         # 統計情報を表示
         display_statistics()  # ページナビゲーションの設定（絶対パスを使用）

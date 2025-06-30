@@ -58,6 +58,14 @@ def enhanced_chatbot_page():
     if "chatbot_helper" not in st.session_state:
         st.session_state.chatbot_helper = ChatBotHelper()
 
+    # チャットメッセージの初期化
+    if "chat_messages" not in st.session_state:
+        st.session_state.chat_messages = []
+
+    # 現在のチャットIDの初期化
+    if "current_chat_id" not in st.session_state:
+        st.session_state.current_chat_id = None
+
     # サイドバーの設定
     with st.sidebar:
         st.subheader("⚙️ チャット設定")

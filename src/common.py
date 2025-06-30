@@ -154,19 +154,6 @@ def setup_authentication():
     return authenticator
 
 
-def show_welcome_message():
-    """ウェルカムメッセージの表示"""
-    st.markdown(
-        f"""
-    <div class='main-header'>
-        <h1>🤖 チャットボットアプリへようこそ！</h1>
-        <p>こんにちは、{st.session_state.get('name', 'ユーザー')}さん！素晴らしい一日をお過ごしください。</p>
-    </div>
-    """,
-        unsafe_allow_html=True,
-    )
-
-
 def initialize_managers():
     """データマネージャーとチャットボットヘルパーの初期化"""
     if "data_manager" not in st.session_state:
