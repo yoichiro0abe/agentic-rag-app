@@ -56,7 +56,7 @@ poetry install
 
 3. アプリケーションを起動:
 ```bash
-poetry run streamlit run src/app.py
+poetry run streamlit run src/app.py --server.runOnSave true
 ```
 
 または:
