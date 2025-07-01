@@ -232,9 +232,8 @@ def enhanced_analysis_bot_page():
 
         # サンプルタスクの選択
         sample_tasks = {
-            "生産スケジュール最適化": """## 以下のCSVデータは初期の生産スケジュールを表します。
-### L1,L2,L3,L4,L5はラインを表す。
-### P1からP20は商品を表す。
+            "生産スケジュール最適化": """以下のCSVデータは工場の生産スケジュールを表します。
+L1からL5は生産ラインを、P1からP20は製品を表します。
 
 時間帯,L1,L2,L3,L4,L5
 0:00-1:00,P1,P2,P3,P4,P5
@@ -262,7 +261,7 @@ def enhanced_analysis_bot_page():
 22:00-23:00,,,P13,P19,P20
 23:00-24:00,,,,P19,P20
 
-P19,P20の生産をやめて、P1を生産する時間を最も長くした場合のスケジュールを考えてください。日本語で回答してください。""",
+このスケジュールでP19とP20の生産を停止し、P1の生産時間を最大化した場合の新しいスケジュールを提案してください。""",
             "データ分析タスク": """売上データの分析を行ってください。
 1. 売上トレンドの分析
 2. 季節性の検出
@@ -372,39 +371,37 @@ def setup_multiagent_team():
         # Reasoner（推論担当）エージェント
         planning_agent = AssistantAgent(
             name="PlanningAgent",
-            description="An agent for planning tasks, this agent should be the first to engage when given a new task.",
+            description="タスクの計画と管理を行うエージェント",
             model_client=model_client,
-            system_message="""
-            You are a planning agent.
-Your job is to break down complex tasks into smaller, manageable subtasks and delegate them to team members. You do not execute tasks or verify results yourself during the planning phase.
-Your team members are:
-    WebSearchAgent: Specializes in information retrieval from the web.
-    DataAnalystAgent: Parses instructions, converts them into mathematical or statistical formulas and Python/SQL code, executes data analysis, and delivers efficient, accurate results.
-**Planning Phase Instructions**:
-1. Analyze the task and break it into clear, actionable subtasks.
-2. Assign each subtask to the appropriate agent using the format:
-   - 1. <agent> : <task>
-3. Outline a verification process to check results after they are received, but do not mention or assume actions like "TERMINATE" in the plan.
-4. Your plan should only include task assignments and a description of what will be verified later.
-**Verification Phase** (after receiving results):
-- Verify the results against the task requirements.
-- If results are correct, conclude with "TERMINATE".
-- If results are incorrect, provide specific, practical feedback to the responsible agent for revisions.
+            system_message="""あなたは計画エージェントです。
+あなたの役割は複雑なタスクを小さな管理可能なサブタスクに分解し、チームメンバーに委任することです。
+
+チームメンバー:
+- WebSearchAgent: ウェブからの情報検索を専門とします
+- DataAnalystAgent: データ分析、Python/SQLコードの実行を行います
+
+計画フェーズの指示:
+1. タスクを分析し、明確で実行可能なサブタスクに分解する
+2. 各サブタスクを適切なエージェントに割り当てる
+3. 結果を受け取った後の検証プロセスを計画する
+
+検証フェーズ（結果受け取り後）:
+- タスク要件に対して結果を検証する
+- 結果が正しい場合、"TERMINATE"で終了する
+- 結果が不正確な場合、具体的なフィードバックを提供する
 **Critical Rule**: Do not use or reference the word "TERMINATE" in the planning phase. It is only used after verifying results.
-""",
+必ず日本語で回答してください。""",
         )
 
         web_search_agent = AssistantAgent(
             "WebSearchAgent",
-            description="An agent for searching information on the web.",
+            description="ウェブ検索を行うエージェント",
             tools=[search_duckduckgo],
             model_client=model_client,
-            system_message="""
-            You are a web search agent.
-            Your only tool is search_tool - use it to find information.
-            You make only one search call at a time.
-            Once you have the results, you never do calculations based on them.
-            """,
+            system_message="""あなたはウェブ検索エージェントです。
+search_duckduckgoツールを使用して情報を検索します。
+一度に1回の検索を行い、結果に基づいた計算は行いません。
+必ず日本語で回答してください。""",
         )
 
         execute_tool = PythonCodeExecutionTool(
@@ -416,32 +413,45 @@ Your team members are:
         data_analyst_agent = AssistantAgent(
             name="DataAnalystAgent",
             model_client=model_client,
-            description="An agent for performing calculations.",
-            system_message="""You are a data analysis agent. Use the ReAct framework (Reasoning and Acting) for your tasks.
-Follow this format for each turn:
-Thought: [Analysis of the problem, approach to solving it]
-Action: execute_tool([Python code])
-Observation: [Results of code execution]
-Thought: [Interpretation of results and next steps]
-Break down complex problems into smaller steps.
-Always clarify the purpose when writing code.
-Analyze execution results in detail and connect them to the next action.
-If data is not visible, clearly ask for the required data.
-""",
+            description="データ分析を行うエージェント",
+            system_message="""あなたはデータ分析エージェントです。ReActフレームワーク（推論と行動）を使用してタスクを実行します。
+
+各ターンで以下の形式に従ってください：
+思考: [問題の分析、解決へのアプローチ]
+行動: execute_tool([Pythonコード])
+観察: [コード実行の結果]
+思考: [結果の解釈と次のステップ]
+
+複雑な問題を小さなステップに分解します。
+コードを書く際は目的を明確にします。
+実行結果を詳細に分析し、次の行動につなげます。
+データが見えない場合は、必要なデータを明確に求めます。
+必ず日本語で回答してください。""",
             tools=[execute_tool],
             reflect_on_tool_use=True,
         )
 
-        selector_prompt = """Select an agent to perform task.
+        selector_prompt = """会話の状況に応じて次のタスクを実行する role を選択することです。
+## 次の話者の選択ルール
 
+各 role の概要は以下です。
 {roles}
+次のタスクに選択可能な participants は以下です。
 
-Current conversation context:
+{participants}
+
+以下のルールに従って、次のを選択してください。
+
+- 会話履歴を確認し、次の会話に最適な role を選択します。role name のみを返してください。
+- role は1つだけ選択してください。
+- 他の role が作業を開始する前に、"PlannerAgent" にタスクを割り当て、サブタスクを計画してもらうことが必要です。
+  - PlannerAgent はサブタスクの計画のみを行います。サブタスクの作業を依頼してはいけません。
+- PlannerAgent が計画したサブタスクに応じて、role を選択します。
+- タスクを完了するための必要な情報が揃ったと判断したら "SummaryAgent" に最終回答の作成を依頼します。
+
+## 会話履歴
+
 {history}
-
-Read the above conversation, then select an agent from {participants} to perform the next task.
-Make sure the planner agent has assigned tasks before other agents start working.
-Only select one agent.
 """
 
         text_mention_termination = TextMentionTermination("TERMINATE")
@@ -467,34 +477,9 @@ Only select one agent.
 
 
 async def run_multiagent_chat(chat, task):
-    """マルチエージェントチャットの実行"""
-    try:
-        # Streamlitでリアルタイム表示するためのプレースホルダー
-        status_placeholder = st.empty()
-        result_placeholder = st.empty()
-
-        status_placeholder.text("チャットを開始しています...")
-
-        # ストリーミング結果を収集
-        messages = []
-        async for message in chat.run_stream(task=task):
-            messages.append(message)
-            # リアルタイムで進行状況を表示
-            status_placeholder.text(f"メッセージ処理中... ({len(messages)} 件)")
-
-            # 最新のメッセージを表示
-            if messages:
-                latest_msg = messages[-1]
-                result_placeholder.text_area(
-                    "最新のメッセージ:", str(latest_msg), height=200
-                )
-
-        status_placeholder.success("チャット完了！")
-        return messages
-
-    except Exception as e:
-        st.error(f"チャット実行エラー: {str(e)}")
-        return None
+    """マルチエージェントチャットの実行（非推奨 - run_multiagent_analysisを使用してください）"""
+    # この関数は後方互換性のために残していますが、使用されません
+    pass
 
 
 def run_multiagent_analysis(task_input, max_turns, max_messages):
@@ -513,22 +498,36 @@ def run_multiagent_analysis(task_input, max_turns, max_messages):
             "TERMINATE"
         ) | MaxMessageTermination(max_messages=max_messages)
 
-        # 非同期実行
-        try:
-            # 既存のイベントループがある場合の処理
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                # Streamlitでは新しいスレッドで実行
-                with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(
-                        asyncio.run, run_multiagent_chat(chat, task_input)
-                    )
-                    messages = future.result(timeout=300)  # 5分タイムアウト
-            else:
-                messages = asyncio.run(run_multiagent_chat(chat, task_input))
-        except RuntimeError:
-            # イベントループが見つからない場合
-            messages = asyncio.run(run_multiagent_chat(chat, task_input))
+        # 同期的にマルチエージェントチャットを実行
+        def run_sync_multiagent_chat():
+            """同期実行のためのラッパー関数"""
+
+            async def async_chat():
+                try:
+                    messages = []
+                    async for message in chat.run_stream(task=task_input):
+                        messages.append(message)
+                        # 進行状況をログに出力
+                        logger.info(f"メッセージ受信: {len(messages)} 件目")
+                    return messages
+                except Exception as e:
+                    logger.error(f"チャット実行エラー: {str(e)}")
+                    raise e
+
+            # 新しいイベントループで実行
+            return asyncio.run(async_chat())
+
+        # ThreadPoolExecutorを使用して非同期処理を実行
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(run_sync_multiagent_chat)
+            try:
+                messages = future.result(timeout=300)  # 5分タイムアウト
+            except concurrent.futures.TimeoutError:
+                st.error("処理がタイムアウトしました（5分）")
+                return "タイムアウトエラー"
+            except Exception as e:
+                st.error(f"実行エラー: {str(e)}")
+                return f"実行エラー: {str(e)}"
 
         end_time = datetime.now()
         duration = (end_time - start_time).total_seconds()
@@ -557,6 +556,7 @@ def run_multiagent_analysis(task_input, max_turns, max_messages):
         }
 
     except Exception as e:
+        logger.error(f"マルチエージェント分析エラー: {str(e)}")
         st.error(f"マルチエージェント分析エラー: {str(e)}")
         return f"エラー: {str(e)}"
 
