@@ -1,16 +1,15 @@
 # 標準ライブラリ
 import streamlit as st
-import pandas as pd
-import json
 import os
-import sys
 import asyncio
 import logging
 import concurrent.futures
 from datetime import datetime
+import queue
+import threading
 
-# ローカルモジュール
-from utils.database import DataManager
+# ローカルモジュール（現在使用されていないが、将来使用される可能性があるため保持）
+# from utils.database import DataManager
 
 from autogen_agentchat.agents import (
     AssistantAgent,
@@ -34,205 +33,24 @@ logger.setLevel(logging.INFO)
 
 def enhanced_analysis_bot_page():
     """拡張された分析ボット画面"""
-    st.header("📊 分析ボット")
+    st.header("🤖 マルチエージェント分析")
+    st.subheader("📝 タスク入力")
 
-    tabs = st.tabs(
-        ["ファイル分析", "チャット分析", "データエクスポート", "マルチエージェント分析"]
-    )
+    # セッション状態の初期化を最初に行う
+    if "current_analysis" not in st.session_state:
+        st.session_state.current_analysis = {
+            "running": False,
+            "messages": [],
+            "start_time": None,
+            "status": "待機中",
+        }
 
-    with tabs[0]:
-        st.subheader("📁 ファイル分析")
+    if "multiagent_history" not in st.session_state:
+        st.session_state.multiagent_history = []
 
-        # ファイルアップロード
-        uploaded_file = st.file_uploader(
-            "分析するファイルをアップロードしてください",
-            type=["csv", "xlsx", "json", "txt"],
-        )
-
-        if uploaded_file is not None:
-            st.success(f"ファイル '{uploaded_file.name}' がアップロードされました。")
-
-            # ファイルタイプに応じた分析
-            if uploaded_file.type == "text/csv":
-                df = pd.read_csv(uploaded_file)
-
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.metric("行数", len(df))
-                    st.metric("列数", len(df.columns))
-                with col2:
-                    st.metric("データサイズ", f"{uploaded_file.size:,} bytes")
-                    st.metric(
-                        "欠損値",
-                        f"{df.isnull().sum().sum():,} 個" if not df.empty else "0 個",
-                    )
-
-                # データプレビュー
-                st.subheader("📋 データプレビュー")
-                st.dataframe(df.head(10))
-
-                # 基本統計情報
-                if not df.empty:
-                    st.subheader("📈 基本統計情報")
-                    st.dataframe(df.describe())
-
-                    # 列の詳細情報
-                    st.subheader("🔍 列の詳細情報")
-                    col_info = pd.DataFrame(
-                        {
-                            "データ型": df.dtypes,
-                            "欠損値数": df.isnull().sum(),
-                            "欠損値率": (df.isnull().sum() / len(df) * 100).round(2),
-                            "ユニーク値数": df.nunique(),
-                        }
-                    )
-                    st.dataframe(col_info)
-
-            elif uploaded_file.type in ["application/json", "text/plain"]:
-                try:
-                    content = uploaded_file.read().decode("utf-8")
-                    if uploaded_file.type == "application/json":
-                        data = json.loads(content)
-                        st.subheader("📋 JSON構造")
-                        st.json(data)
-
-                        st.metric("データサイズ", f"{len(content):,} 文字")
-                        if isinstance(data, list):
-                            st.metric("配列要素数", len(data))
-                        elif isinstance(data, dict):
-                            st.metric("キー数", len(data.keys()))
-                    else:
-                        st.subheader("📋 テキスト内容")
-                        st.text_area("内容", content, height=300)
-
-                        lines = content.split("\n")
-                        st.metric("行数", len(lines))
-                        st.metric("文字数", len(content))
-                        st.metric("単語数", len(content.split()))
-
-                except Exception as e:
-                    st.error(f"ファイルの読み込みに失敗しました: {str(e)}")
-
-    with tabs[1]:
-        st.subheader("💬 チャット分析")
-
-        # データマネージャーの初期化
-        if "data_manager" not in st.session_state:
-            DATA_DIR = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
-            )
-            st.session_state.data_manager = DataManager(DATA_DIR)
-
-        data_manager = st.session_state.get("data_manager")
-        if data_manager:
-            chat_history = data_manager.load_chat_history()
-
-            if chat_history:
-                col1, col2, col3 = st.columns(3)
-                with col1:
-                    st.metric("総チャット数", len(chat_history))
-                with col2:
-                    total_messages = sum(
-                        len(chat.get("messages", [])) for chat in chat_history
-                    )
-                    st.metric("総メッセージ数", total_messages)
-                with col3:
-                    avg_messages = (
-                        total_messages / len(chat_history) if chat_history else 0
-                    )
-                    st.metric("チャット当たり平均メッセージ数", f"{avg_messages:.1f}")
-
-                # 最新のチャット活動
-                st.subheader("📅 最新のチャット活動")
-                recent_chats = sorted(
-                    chat_history, key=lambda x: x.get("created_at", ""), reverse=True
-                )[:5]
-
-                for chat in recent_chats:
-                    with st.expander(f"💬 {chat.get('title', '無題のチャット')}"):
-                        st.write(f"📅 作成日時: {chat.get('created_at', '不明')}")
-                        st.write(f"💬 メッセージ数: {len(chat.get('messages', []))}")
-
-                        messages = chat.get("messages", [])
-                        if messages:
-                            st.write("最初のメッセージ:")
-                            st.write(f"👤 {messages[0].get('content', '')[:100]}...")
-            else:
-                st.info("チャット履歴がありません。")
-
-    with tabs[2]:
-        st.subheader("📤 データエクスポート")
-
-        # データマネージャーの初期化
-        if "data_manager" not in st.session_state:
-            DATA_DIR = os.path.join(
-                os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data"
-            )
-            st.session_state.data_manager = DataManager(DATA_DIR)
-
-        data_manager = st.session_state.get("data_manager")
-
-        export_type = st.selectbox(
-            "エクスポートするデータを選択", ["チャット履歴", "プロンプトライブラリ"]
-        )
-
-        if st.button("📥 エクスポート", use_container_width=True):
-            try:
-                if export_type == "チャット履歴" and data_manager:
-                    chat_history = data_manager.load_chat_history()
-                    if chat_history:
-                        # チャット履歴をCSV形式で変換
-                        export_data = []
-                        for chat in chat_history:
-                            for message in chat.get("messages", []):
-                                export_data.append(
-                                    {
-                                        "チャットID": chat.get("id"),
-                                        "チャットタイトル": chat.get("title"),
-                                        "作成日時": chat.get("created_at"),
-                                        "ロール": message.get("role"),
-                                        "内容": message.get("content"),
-                                    }
-                                )
-
-                        if export_data:
-                            df = pd.DataFrame(export_data)
-                            csv = df.to_csv(index=False, encoding="utf-8-sig")
-                            st.download_button(
-                                label="💾 チャット履歴をCSVでダウンロード",
-                                data=csv,
-                                file_name="chat_history.csv",
-                                mime="text/csv",
-                            )
-                        else:
-                            st.warning("エクスポートするデータがありません。")
-                    else:
-                        st.warning("チャット履歴がありません。")
-
-                elif export_type == "プロンプトライブラリ" and data_manager:
-                    prompts = data_manager.load_prompts()
-                    if prompts:
-                        df = pd.DataFrame(prompts)
-                        csv = df.to_csv(index=False, encoding="utf-8-sig")
-                        st.download_button(
-                            label="💾 プロンプトライブラリをCSVでダウンロード",
-                            data=csv,
-                            file_name="prompts.csv",
-                            mime="text/csv",
-                        )
-                    else:
-                        st.warning("プロンプトライブラリにデータがありません。")
-
-            except Exception as e:
-                st.error(f"エクスポートに失敗しました: {str(e)}")
-
-    with tabs[3]:
-        st.subheader("🤖 マルチエージェント分析")
-        st.subheader("📝 タスク入力")
-
-        # サンプルタスクの選択
-        sample_tasks = {
-            "生産スケジュール最適化": """以下のCSVデータは工場の生産スケジュールを表します。
+    # サンプルタスクの選択
+    sample_tasks = {
+        "生産スケジュール最適化": """以下のCSVデータは工場の生産スケジュールを表します。
 L1からL5は生産ラインを、P1からP20は製品を表します。
 
 時間帯,L1,L2,L3,L4,L5
@@ -262,71 +80,566 @@ L1からL5は生産ラインを、P1からP20は製品を表します。
 23:00-24:00,,,,P19,P20
 
 このスケジュールでP19とP20の生産を停止し、P1の生産時間を最大化した場合の新しいスケジュールを提案してください。""",
-            "データ分析タスク": """売上データの分析を行ってください。
+        "データ分析タスク": """売上データの分析を行ってください。
 1. 売上トレンドの分析
 2. 季節性の検出
 3. 予測モデルの作成
 分析結果を日本語でレポートしてください。""",
-            "カスタムタスク": "",
+        "カスタムタスク": "",
+    }
+
+    selected_task = st.selectbox("サンプルタスクを選択", list(sample_tasks.keys()))
+
+    task_input = st.text_area(
+        "分析タスクを入力してください:",
+        value=sample_tasks[selected_task],
+        height=300,
+        help="マルチエージェントが協力して解決するタスクを記述してください",
+    )
+
+    # 実行設定
+    col1, col2 = st.columns(2)
+    with col1:
+        max_turns = st.slider("最大ターン数", 5, 50, 20)
+    with col2:
+        max_messages = st.slider("最大メッセージ数", 5, 50, 10)
+
+    # 実行ボタン
+    if st.button(
+        "🚀 マルチエージェント分析を開始",
+    ):
+        # 分析開始
+        st.session_state.current_analysis["running"] = True
+        st.session_state.current_analysis["messages"] = []
+        st.session_state.current_analysis["start_time"] = datetime.now()
+        st.session_state.current_analysis["status"] = "実行中"
+        st.session_state.current_task = task_input  # タスクを保存
+
+        # リアルタイム分析を開始
+        run_realtime_multiagent_analysis(task_input, max_turns, max_messages)
+
+    # 現在の分析状況を表示
+    current_analysis = st.session_state.get("current_analysis", {})
+    if current_analysis.get("running"):
+        display_realtime_analysis_status()
+
+        # 自動更新のための JavaScript を挿入
+        st.markdown(
+            """
+        <script>
+        function autoRefresh() {
+            setTimeout(function() {
+                if (window.location.hash !== '#manual-stop') {
+                    window.location.reload();
+                }
+            }, 3000);  // 3秒ごとに更新
         }
+        autoRefresh();
+        </script>
+        """,
+            unsafe_allow_html=True,
+        )
+    elif current_analysis.get("messages") and not current_analysis.get("running"):
+        # 分析完了時の通知と自動更新促進
+        st.success("🎉 分析が完了しました！下記の結果をご確認ください。")
 
-        selected_task = st.selectbox("サンプルタスクを選択", list(sample_tasks.keys()))
-
-        task_input = st.text_area(
-            "分析タスクを入力してください:",
-            value=sample_tasks[selected_task],
-            height=300,
-            help="マルチエージェントが協力して解決するタスクを記述してください",
+        # 完了後の自動更新スクリプト（短い間隔で1回だけ）
+        st.markdown(
+            """
+        <script>
+        // 分析完了時の一回限り自動更新
+        if (!sessionStorage.getItem('analysis_completed_refresh')) {
+            sessionStorage.setItem('analysis_completed_refresh', 'true');
+            setTimeout(function() {
+                window.location.reload();
+            }, 1000);  // 1秒後に1回だけ更新
+        }
+        </script>
+        """,
+            unsafe_allow_html=True,
         )
 
-        # 実行設定
-        col1, col2 = st.columns(2)
-        with col1:
-            max_turns = st.slider("最大ターン数", 5, 50, 20)
-        with col2:
-            max_messages = st.slider("最大メッセージ数", 5, 50, 10)
+    # 分析結果表示エリア
+    if current_analysis.get("messages"):
+        st.subheader("📊 リアルタイム分析結果")
 
-        # 実行ボタン
-        if st.button(
-            "🚀 マルチエージェント分析を開始",
-        ):
-            with st.spinner("マルチエージェント分析を実行中..."):
-                try:
-                    result = run_multiagent_analysis(
-                        task_input, max_turns, max_messages
-                    )
+        # メッセージが新しく追加された場合の通知
+        message_count = len(current_analysis["messages"])
+        if message_count > 0:
+            st.success(f"✨ {message_count} 件のメッセージを受信しました")
 
-                    st.subheader("📊 分析結果")
+        display_multiagent_chat(current_analysis["messages"])
 
-                    # 結果の表示
-                    if isinstance(result, dict):
-                        st.json(result)
-                    else:
-                        st.text(result)
+        # 実行中でない場合はサマリーを表示
+        if not current_analysis.get("running"):
+            st.subheader("📈 実行サマリー")
+            display_analysis_summary()
 
-                except Exception as e:
-                    st.error(f"分析の実行中にエラーが発生しました: {str(e)}")
-                    st.exception(e)
+            # 履歴に保存
+            save_analysis_to_history()
 
-        # 実行履歴の表示
-        if "multiagent_history" not in st.session_state:
-            st.session_state.multiagent_history = []
-
-        if st.session_state.multiagent_history:
-            st.subheader("📋 実行履歴")
-            for i, record in enumerate(
-                reversed(st.session_state.multiagent_history[-5:])
+    # 実行履歴の表示
+    multiagent_history = st.session_state.get("multiagent_history", [])
+    if multiagent_history:
+        st.subheader("📋 実行履歴")
+        for i, record in enumerate(reversed(multiagent_history[-5:])):
+            with st.expander(
+                f"実行 {len(multiagent_history) - i}: {record['timestamp']}"
             ):
-                with st.expander(
-                    f"実行 {len(st.session_state.multiagent_history) - i}: {record['timestamp']}"
-                ):
-                    st.text(f"タスク: {record['task'][:100]}...")
-                    st.text(f"実行時間: {record['duration']:.1f}秒")
-                    if record.get("result"):
-                        st.text_area("結果", record["result"], height=200)
+                st.text(f"タスク: {record['task'][:100]}...")
+                st.text(f"実行時間: {record['duration']:.1f}秒")
+
+                # 履歴にもチャット形式で表示
+                if record.get("messages"):
+                    st.subheader("💬 エージェント会話履歴")
+                    display_multiagent_chat(record["messages"])
+                elif record.get("result"):
+                    st.text_area("結果", record["result"], height=200)
 
 
 # マルチエージェント関連の関数
+def display_realtime_analysis_status():
+    """リアルタイム分析の状況を表示"""
+    if "current_analysis" not in st.session_state:
+        return
+
+    analysis = st.session_state.current_analysis
+
+    # ステータス表示
+    status_container = st.container()
+    with status_container:
+        col1, col2, col3, col4 = st.columns(4)
+
+        with col1:
+            if analysis.get("running"):
+                st.markdown("🔄 **実行中**")
+            else:
+                st.markdown("✅ **完了**")
+
+        with col2:
+            elapsed = 0
+            if analysis.get("start_time"):
+                elapsed = (datetime.now() - analysis["start_time"]).total_seconds()
+            st.metric("経過時間", f"{elapsed:.1f}秒")
+
+        with col3:
+            message_count = len(analysis.get("messages", []))
+            st.metric("受信メッセージ数", message_count)
+
+        with col4:
+            if analysis.get("running"):
+                # 停止ボタン
+                if st.button("⏹️ 停止", key="stop_analysis_status"):
+                    st.session_state.current_analysis["running"] = False
+                    st.rerun()
+
+
+def save_analysis_to_history():
+    """現在の分析結果を履歴に保存"""
+    if "current_analysis" not in st.session_state:
+        return
+
+    if "multiagent_history" not in st.session_state:
+        st.session_state.multiagent_history = []
+
+    analysis = st.session_state.current_analysis
+    if analysis.get("messages") and analysis.get("start_time"):
+        duration = (datetime.now() - analysis["start_time"]).total_seconds()
+
+        # 重複チェック（同じタイムスタンプの履歴があるかチェック）
+        timestamp = analysis["start_time"].strftime("%Y-%m-%d %H:%M:%S")
+        existing = any(
+            record.get("timestamp") == timestamp
+            for record in st.session_state.multiagent_history
+        )
+
+        if not existing:
+            st.session_state.multiagent_history.append(
+                {
+                    "timestamp": timestamp,
+                    "task": getattr(st.session_state, "current_task", "不明なタスク")[
+                        :100
+                    ],
+                    "duration": duration,
+                    "result": f"分析完了 ({len(analysis['messages'])} メッセージ)",
+                    "messages": analysis["messages"],
+                }
+            )
+
+
+def display_analysis_summary():
+    """分析のサマリー情報を表示"""
+    if "current_analysis" not in st.session_state:
+        return
+
+    analysis = st.session_state.current_analysis
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        elapsed = 0
+        if analysis.get("start_time"):
+            elapsed = (datetime.now() - analysis["start_time"]).total_seconds()
+        st.metric("総実行時間", f"{elapsed:.1f}秒")
+
+    with col2:
+        message_count = len(analysis.get("messages", []))
+        st.metric("総メッセージ数", message_count)
+
+    with col3:
+        status = "完了" if message_count > 0 else "エラー"
+        st.metric("ステータス", status)
+
+
+def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
+    """リアルタイムマルチエージェント分析の実行"""
+    try:
+        # チームセットアップ
+        chat = setup_multiagent_team()
+        if not chat:
+            st.error("チームのセットアップに失敗しました")
+            st.session_state.current_analysis["running"] = False
+            return
+
+        # 設定更新
+        chat.max_turns = max_turns
+        chat.termination_condition = TextMentionTermination(
+            "TERMINATE"
+        ) | MaxMessageTermination(max_messages=max_messages)
+
+        # メッセージキューを作成
+        message_queue = queue.Queue()
+        running_flag = threading.Event()
+        running_flag.set()  # 実行中フラグを設定
+
+        def execute_chat():
+            """チャット実行スレッド"""
+            try:
+                # 新しいイベントループを作成
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+                async def run_chat():
+                    message_count = 0
+                    try:
+                        async for message in chat.run_stream(task=task_input):
+                            if not running_flag.is_set():
+                                break
+
+                            message_count += 1
+                            # メッセージをキューに追加（スレッドセーフ）
+                            message_queue.put(("message", message))
+
+                            # ログ出力
+                            logger.info(
+                                f"リアルタイムメッセージ受信: {message_count} 件目"
+                            )
+
+                            # 少し待機（UI更新のため）
+                            await asyncio.sleep(0.1)
+                    except Exception as e:
+                        message_queue.put(("error", str(e)))
+                    finally:
+                        message_queue.put(("done", None))
+
+                loop.run_until_complete(run_chat())
+
+            except Exception as e:
+                logger.error(f"チャット実行エラー: {str(e)}")
+                message_queue.put(("error", str(e)))
+
+        # バックグラウンドでチャット実行開始
+        chat_thread = threading.Thread(target=execute_chat)
+        chat_thread.daemon = True
+        chat_thread.start()
+
+        # キューからメッセージを取得してセッション状態を更新
+        while True:
+            try:
+                # ノンブロッキングでキューから取得
+                msg_type, msg_data = message_queue.get_nowait()
+
+                if msg_type == "message":
+                    st.session_state.current_analysis["messages"].append(msg_data)
+                elif msg_type == "error":
+                    st.session_state.current_analysis["error"] = msg_data
+                    st.session_state.current_analysis["running"] = False
+                    running_flag.clear()
+                    break
+                elif msg_type == "done":
+                    st.session_state.current_analysis["running"] = False
+                    running_flag.clear()
+                    break
+
+            except queue.Empty:
+                # キューが空の場合は少し待機
+                import time
+
+                time.sleep(0.1)
+                # UIがブロックされないよう、適当なタイミングで一旦UIを更新
+                if len(st.session_state.current_analysis["messages"]) > 0:
+                    break
+
+        # 進行状況の表示
+        progress_container = st.container()
+        with progress_container:
+            st.info(
+                "🚀 マルチエージェント分析を開始しました。メッセージが届き次第、下に表示されます。"
+            )
+
+            # 手動更新ボタンと停止ボタン
+            col1, col2, col3 = st.columns([1, 1, 3])
+
+            with col1:
+                # 常に表示される更新ボタン
+                refresh_clicked = st.button("🔄 最新状況を確認", key="refresh_status")
+                if refresh_clicked:
+                    st.rerun()
+
+            with col2:
+                if st.session_state.current_analysis.get("running"):
+                    stop_clicked = st.button("⏹️ 分析停止", key="stop_analysis_main")
+                    if stop_clicked:
+                        st.session_state.current_analysis["running"] = False
+                        running_flag.clear()
+                        st.success("分析を停止しました。")
+                        st.rerun()
+                else:
+                    # 分析が完了している場合は無効化されたボタンを表示
+                    st.button(
+                        "⏹️ 分析停止", key="stop_analysis_main_disabled", disabled=True
+                    )
+
+            with col3:
+                if st.session_state.current_analysis.get("running"):
+                    st.info(
+                        "⏳ 分析実行中... 「最新状況を確認」ボタンで手動更新できます"
+                    )
+                else:
+                    st.success("✅ 分析完了 - 結果が下に表示されています")
+
+    except Exception as e:
+        logger.error(f"リアルタイム分析エラー: {str(e)}")
+        st.error(f"分析の開始に失敗しました: {str(e)}")
+        st.session_state.current_analysis["running"] = False
+        st.session_state.current_analysis["error"] = str(e)
+
+
+def get_agent_info(agent_name):
+    """エージェント情報を取得（アイコンと色）"""
+    agent_configs = {
+        "PlanningAgent": {
+            "icon": "🎯",
+            "color": "#FF6B6B",
+            "bg_color": "#FFE8E8",
+            "display_name": "計画エージェント",
+        },
+        "WebSearchAgent": {
+            "icon": "🔍",
+            "color": "#4ECDC4",
+            "bg_color": "#E8F9F8",
+            "display_name": "検索エージェント",
+        },
+        "DataAnalystAgent": {
+            "icon": "📊",
+            "color": "#45B7D1",
+            "bg_color": "#E8F4F8",
+            "display_name": "分析エージェント",
+        },
+        "SelectorGroupChat": {
+            "icon": "🤖",
+            "color": "#96CEB4",
+            "bg_color": "#F0F9F4",
+            "display_name": "システム",
+        },
+    }
+
+    return agent_configs.get(
+        agent_name,
+        {
+            "icon": "🤖",
+            "color": "#95A5A6",
+            "bg_color": "#F8F9FA",
+            "display_name": agent_name or "不明",
+        },
+    )
+
+
+def get_message_type_info(message):
+    """メッセージタイプの情報を取得"""
+    # messageの構造を分析してタイプを判定
+    content = getattr(message, "content", "") or str(message)
+
+    # ツール使用の判定
+    tool_keywords = ["execute_tool", "search_duckduckgo"]
+    if hasattr(message, "models_usage") or any(
+        keyword in content for keyword in tool_keywords
+    ):
+        return {
+            "type": "tool_use",
+            "icon": "🔧",
+            "label": "ツール使用",
+            "color": "#F39C12",
+        }
+    # コード実行結果の判定
+    elif any(
+        keyword in content.lower()
+        for keyword in ["実行結果", "result:", "output:", "エラー:", "error:"]
+    ):
+        return {
+            "type": "tool_result",
+            "icon": "📤",
+            "label": "実行結果",
+            "color": "#8E44AD",
+        }
+    # 通常の発言
+    else:
+        return {"type": "message", "icon": "💬", "label": "発言", "color": "#2ECC71"}
+
+
+def display_multiagent_chat(messages):
+    """マルチエージェントの会話をチャット形式で表示"""
+    if not messages:
+        st.info("会話履歴がありません。")
+        return
+
+    st.markdown("### 💬 エージェント会話")
+
+    # メッセージ数の表示
+    st.info(f"📊 総メッセージ数: {len(messages)}")
+
+    # メッセージを順番に表示
+    for i, message in enumerate(messages):
+        # メッセージの属性を安全に取得
+        source = getattr(message, "source", None)
+        content = getattr(message, "content", "")
+
+        # contentが空の場合は、messageを文字列化
+        if not content:
+            content = str(message) if message is not None else ""
+
+        # contentが文字列でない場合は文字列化
+        if not isinstance(content, str):
+            content = str(content)
+
+        # sourceが辞書の場合、nameを取得
+        if isinstance(source, dict):
+            agent_name = source.get("name", "Unknown")
+        elif hasattr(source, "name"):
+            agent_name = source.name
+        elif source:
+            agent_name = str(source)
+        else:
+            # contentから推測を試みる
+            content_lower = content.lower() if content else ""
+            if "planning" in content_lower or "計画" in content or "分解" in content:
+                agent_name = "PlanningAgent"
+            elif any(
+                [
+                    "search" in content_lower,
+                    "検索" in content,
+                    "duckduckgo" in content_lower,
+                ]
+            ):
+                agent_name = "WebSearchAgent"
+            elif any(
+                [
+                    "execute_tool" in content,
+                    "python" in content_lower,
+                    "分析" in content,
+                ]
+            ):
+                agent_name = "DataAnalystAgent"
+            else:
+                agent_name = "システム"
+
+        # エージェント情報を取得
+        agent_info = get_agent_info(agent_name)
+        message_type_info = get_message_type_info(message)
+
+        # メッセージコンテナ
+        with st.container():
+            # ヘッダー部分
+            col1, col2, col3 = st.columns([1, 6, 1])
+
+            with col1:
+                st.markdown(
+                    f"<div style='font-size: 2em;'>{agent_info['icon']}</div>",
+                    unsafe_allow_html=True,
+                )
+
+            with col2:
+                st.markdown(
+                    f"""
+                <div style='padding: 8px; border-radius: 8px; background-color: {agent_info['bg_color']};
+                           border-left: 4px solid {agent_info['color']};'>
+                    <div style='display: flex; align-items: center; margin-bottom: 4px;'>
+                        <strong style='color: {agent_info['color']};'>{agent_info['display_name']}</strong>
+                        <span style='margin-left: 10px; background-color: {message_type_info['color']};
+                                   color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8em;'>
+                            {message_type_info['icon']} {message_type_info['label']}
+                        </span>
+                    </div>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
+
+            with col3:
+                st.markdown(
+                    f"<div style='text-align: right; color: #666; font-size: 0.8em;'>#{i + 1}</div>",
+                    unsafe_allow_html=True,
+                )
+
+            # メッセージ内容（展開可能）
+            preview_text = content[:100] if len(content) > 100 else content
+            with st.expander(
+                f"詳細を表示 - {preview_text}{'...' if len(content) > 100 else ''}",
+                expanded=False,
+            ):
+                # 内容を見やすく表示
+                if len(content) > 1000:
+                    st.text_area("メッセージ内容", content, height=200, disabled=True)
+                elif any(
+                    keyword in content
+                    for keyword in ["```", "def ", "import ", "print("]
+                ):
+                    # コードっぽい内容の場合
+                    st.code(content, language="python")
+                else:
+                    # 通常のテキスト
+                    st.markdown(content)
+
+                # メッセージの詳細情報
+                with st.container():
+                    st.markdown("**📝 メッセージ詳細:**")
+                    details_col1, details_col2 = st.columns(2)
+
+                    with details_col1:
+                        st.write(f"**エージェント名**: {agent_name}")
+                        st.write(f"**メッセージタイプ**: {message_type_info['label']}")
+
+                    with details_col2:
+                        st.write(f"**文字数**: {len(content):,}")
+                        try:
+                            line_count = (
+                                len(content.splitlines())
+                                if isinstance(content, str)
+                                else 1
+                            )
+                            st.write(f"**行数**: {line_count}")
+                        except Exception:
+                            st.write("**行数**: 計算不可")
+
+                        if hasattr(message, "models_usage"):
+                            st.write("**モデル使用**: あり")
+                        else:
+                            st.write("**モデル使用**: なし")
+
+            # 区切り線
+            st.markdown("---")
+
+
 def search_duckduckgo(query: str) -> str:
     """DuckDuckGo検索関数"""
     try:
@@ -387,7 +700,7 @@ def setup_multiagent_team():
 
 検証フェーズ（結果受け取り後）:
 - タスク要件に対して結果を検証する
-- 結果が正しい場合、"TERMINATE"で終了する
+- 結果が正確な場合、"TERMINATE"と発言して終了させてください。
 - 結果が不正確な場合、具体的なフィードバックを提供する
 **Critical Rule**: Do not use or reference the word "TERMINATE" in the planning phase. It is only used after verifying results.
 必ず日本語で回答してください。""",
