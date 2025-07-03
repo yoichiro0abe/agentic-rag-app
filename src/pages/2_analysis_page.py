@@ -212,23 +212,23 @@ P2からP18の生産時間は、プロンプトに記載された時間（P2: 10
             # 履歴に保存
             save_analysis_to_history()
 
-    # 実行履歴の表示
-    multiagent_history = st.session_state.get("multiagent_history", [])
-    if multiagent_history:
-        st.subheader("📋 実行履歴")
-        for i, record in enumerate(reversed(multiagent_history[-5:])):
-            with st.expander(
-                f"実行 {len(multiagent_history) - i}: {record['timestamp']}"
-            ):
-                st.text(f"タスク: {record['task'][:100]}...")
-                st.text(f"実行時間: {record['duration']:.1f}秒")
+    # # 実行履歴の表示
+    # multiagent_history = st.session_state.get("multiagent_history", [])
+    # if multiagent_history:
+    #     st.subheader("📋 実行履歴")
+    #     for i, record in enumerate(reversed(multiagent_history[-5:])):
+    #         with st.expander(
+    #             f"実行 {len(multiagent_history) - i}: {record['timestamp']}"
+    #         ):
+    #             st.text(f"タスク: {record['task'][:100]}...")
+    #             st.text(f"実行時間: {record['duration']:.1f}秒")
 
-                # 履歴にもチャット形式で表示
-                if record.get("messages"):
-                    st.subheader("💬 エージェント会話履歴")
-                    display_multiagent_chat(record["messages"])
-                elif record.get("result"):
-                    st.text_area("結果", record["result"], height=200)
+    #             # 履歴にもチャット形式で表示
+    #             if record.get("messages"):
+    #                 st.subheader("💬 エージェント会話履歴")
+    #                 display_multiagent_chat(record["messages"])
+    #             elif record.get("result"):
+    #                 st.text_area("結果", record["result"], height=200)
 
 
 # マルチエージェント関連の関数
