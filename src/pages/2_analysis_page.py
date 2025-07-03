@@ -5,8 +5,8 @@ import asyncio
 import logging
 import concurrent.futures
 from datetime import datetime
-import queue
 import threading
+import pickle
 
 # ローカルモジュール（現在使用されていないが、将来使用される可能性があるため保持）
 # from utils.database import DataManager
@@ -31,6 +31,46 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 
+def load_messages_from_file():
+    """ファイルからメッセージと完了状態を読み込む"""
+    # メッセージファイルの読み込み
+    messages_file = "tmp/chat_messages.pkl"
+    if os.path.exists(messages_file):
+        try:
+            # ファイルが空でないことを確認
+            if os.path.getsize(messages_file) > 0:
+                with open(messages_file, "rb") as f:
+                    messages = pickle.load(f)
+                    if messages:
+                        st.session_state.current_analysis["messages"] = messages
+                        logger.info(
+                            f"{len(messages)}件のメッセージをファイルから読み込みました。"
+                        )
+        except (pickle.UnpicklingError, EOFError) as e:
+            logger.warning(f"メッセージファイルのデシリアライズに失敗しました: {e}")
+        except Exception as e:
+            logger.error(f"メッセージファイルの読み込み中に予期せぬエラー: {e}")
+
+    # 完了フラグの確認
+    completed_file = "tmp/chat_completed.txt"
+    if os.path.exists(completed_file):
+        st.session_state.current_analysis["running"] = False
+        st.session_state.current_analysis["status"] = "完了"
+        logger.info("完了フラグを検知しました。分析を停止状態に設定します。")
+
+    # エラーファイルの確認
+    error_file = "tmp/chat_error.txt"
+    if os.path.exists(error_file):
+        with open(error_file, "r", encoding="utf-8") as f:
+            error_message = f.read()
+            if error_message:
+                st.session_state.current_analysis["error"] = error_message
+                st.session_state.current_analysis["running"] = False
+                st.session_state.current_analysis["status"] = "エラー"
+                st.error(f"分析中にエラーが発生しました: {error_message}")
+                logger.error(f"エラーファイルを検知: {error_message}")
+
+
 def enhanced_analysis_bot_page():
     """拡張された分析ボット画面"""
     st.header("🤖 マルチエージェント分析")
@@ -48,10 +88,15 @@ def enhanced_analysis_bot_page():
     if "multiagent_history" not in st.session_state:
         st.session_state.multiagent_history = []
 
+    # 実行中でない場合、ファイルから状態を読み込む
+    if not st.session_state.current_analysis.get("running"):
+        load_messages_from_file()
+
     # サンプルタスクの選択
     sample_tasks = {
-        "生産スケジュール最適化": """以下のCSVデータは工場の生産スケジュールを表します。
-L1からL5は生産ラインを、P1からP20は製品を表します。
+        "生産スケジュール最適化": """## 以下のCSVデータは初期の生産スケジュールを表します。
+### L1,L2,L3,L4,L5はラインを表す。
+### P1からP20は商品を表す。
 
 時間帯,L1,L2,L3,L4,L5
 0:00-1:00,P1,P2,P3,P4,P5
@@ -79,12 +124,26 @@ L1からL5は生産ラインを、P1からP20は製品を表します。
 22:00-23:00,,,P13,P19,P20
 23:00-24:00,,,,P19,P20
 
-このスケジュールでP19とP20の生産を停止し、P1の生産時間を最大化した場合の新しいスケジュールを提案してください。""",
-        "データ分析タスク": """売上データの分析を行ってください。
-1. 売上トレンドの分析
-2. 季節性の検出
-3. 予測モデルの作成
-分析結果を日本語でレポートしてください。""",
+## データの説明
+- **生産時間**:
+  - P1, P2: 各10時間生産
+  - P3, P4, P5,P6,P7,P8,P9,P10,P11,P12,P13,P14: 各5時間生産
+  - P15, P16, P17, P18: 各4時間生産
+  - P19, P20:各2時間生産
+  **CSVデータ商品が入ってない枠は空いています。使用しても構いません。**
+- **切替時間**: 同一ラインで商品が替わったとき、切替時間(1時間)が発生します。
+  **同一ラインで同じ商品を連続して生産する場合、切替時間は発生しません。
+- **ラインの割り当て**: 各ラインは24時間使用できる。
+
+# 初期のスケジュールからP19,P20の生産をやめて、P1を生産する時間を最も長くした場合のスケジュールを考えてください。
+
+空き時間（商品が入っていない枠）はP1の生産時間増加や他の商品の生産に活用できます。
+P2からP18の生産時間は、プロンプトに記載された時間（P2: 10時間、P3-P14: 5時間、P15-P18: 4時間）を維持し、
+生産時刻やライン割り当てを自由に変更可能です。
+商品の生産の順番は自由に入れ替えて構いません。
+
+変更後のスケジュールのP1の生産時間を述べてください。
+変更後のスケジュールを元のCSV形式と同じ形で提示してください""",
         "カスタムタスク": "",
     }
 
@@ -121,43 +180,18 @@ L1からL5は生産ラインを、P1からP20は製品を表します。
     # 現在の分析状況を表示
     current_analysis = st.session_state.get("current_analysis", {})
     if current_analysis.get("running"):
+        # 実行中なら、ファイルから最新の状態を読み込んでみる
+        load_messages_from_file()
         display_realtime_analysis_status()
 
-        # 自動更新のための JavaScript を挿入
-        st.markdown(
-            """
-        <script>
-        function autoRefresh() {
-            setTimeout(function() {
-                if (window.location.hash !== '#manual-stop') {
-                    window.location.reload();
-                }
-            }, 3000);  // 3秒ごとに更新
-        }
-        autoRefresh();
-        </script>
-        """,
-            unsafe_allow_html=True,
-        )
+        # 実行中であれば、3秒待ってから再実行して状態を更新 (ポーリング)
+        import time
+
+        time.sleep(3)
+        st.rerun()
     elif current_analysis.get("messages") and not current_analysis.get("running"):
         # 分析完了時の通知と自動更新促進
         st.success("🎉 分析が完了しました！下記の結果をご確認ください。")
-
-        # 完了後の自動更新スクリプト（短い間隔で1回だけ）
-        st.markdown(
-            """
-        <script>
-        // 分析完了時の一回限り自動更新
-        if (!sessionStorage.getItem('analysis_completed_refresh')) {
-            sessionStorage.setItem('analysis_completed_refresh', 'true');
-            setTimeout(function() {
-                window.location.reload();
-            }, 1000);  // 1秒後に1回だけ更新
-        }
-        </script>
-        """,
-            unsafe_allow_html=True,
-        )
 
     # 分析結果表示エリア
     if current_analysis.get("messages"):
@@ -294,6 +328,15 @@ def display_analysis_summary():
 def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
     """リアルタイムマルチエージェント分析の実行"""
     try:
+        # tmpディレクトリの確保
+        os.makedirs("tmp", exist_ok=True)
+
+        # 以前のファイルをクリーンアップ
+        for file_name in ["chat_messages.pkl", "chat_completed.txt", "chat_error.txt"]:
+            file_path = f"tmp/{file_name}"
+            if os.path.exists(file_path):
+                os.remove(file_path)
+
         # チームセットアップ
         chat = setup_multiagent_team()
         if not chat:
@@ -307,13 +350,9 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
             "TERMINATE"
         ) | MaxMessageTermination(max_messages=max_messages)
 
-        # メッセージキューを作成
-        message_queue = queue.Queue()
-        running_flag = threading.Event()
-        running_flag.set()  # 実行中フラグを設定
-
-        def execute_chat():
-            """チャット実行スレッド"""
+        # シンプルなバックグラウンド実行
+        def execute_chat_simple():
+            """チャット実行スレッド（シンプル版）"""
             try:
                 # 新しいイベントループを作成
                 loop = asyncio.new_event_loop()
@@ -321,70 +360,74 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
 
                 async def run_chat():
                     message_count = 0
+                    messages_buffer = []  # バッファーに一時保存
                     try:
                         async for message in chat.run_stream(task=task_input):
-                            if not running_flag.is_set():
+                            # セッション状態の安全な確認
+                            if hasattr(
+                                st.session_state, "current_analysis"
+                            ) and not st.session_state.current_analysis.get(
+                                "running", False
+                            ):
+                                logger.info("実行停止が要求されました")
                                 break
 
                             message_count += 1
-                            # メッセージをキューに追加（スレッドセーフ）
-                            message_queue.put(("message", message))
+                            # バッファーに追加（別スレッドから直接セッション状態にアクセスしない）
+                            messages_buffer.append(message)
 
                             # ログ出力
                             logger.info(
-                                f"リアルタイムメッセージ受信: {message_count} 件目"
+                                f"リアルタイムメッセージ受信・バッファ保存: {message_count} 件目"
                             )
 
                             # 少し待機（UI更新のため）
                             await asyncio.sleep(0.1)
+
                     except Exception as e:
-                        message_queue.put(("error", str(e)))
+                        logger.error(f"チャット実行中エラー: {str(e)}")
+                        # エラー情報をファイルに保存（セッション状態にアクセス不可のため）
+                        with open("tmp/chat_error.txt", "w", encoding="utf-8") as f:
+                            f.write(str(e))
                     finally:
-                        message_queue.put(("done", None))
+                        # 完了時にメッセージをファイルに保存
+                        try:
+                            import pickle
+
+                            # メッセージをpickleで保存（オブジェクトの状態を保持）
+                            with open("tmp/chat_messages.pkl", "wb") as f:
+                                pickle.dump(messages_buffer, f)
+
+                            # 完了フラグを作成
+                            with open(
+                                "tmp/chat_completed.txt", "w", encoding="utf-8"
+                            ) as f:
+                                f.write(f"completed:{message_count}")
+
+                            logger.info(
+                                f"チャット実行完了。総メッセージ数: {message_count}"
+                            )
+                        except Exception as save_error:
+                            logger.error(f"メッセージ保存エラー: {str(save_error)}")
 
                 loop.run_until_complete(run_chat())
 
             except Exception as e:
                 logger.error(f"チャット実行エラー: {str(e)}")
-                message_queue.put(("error", str(e)))
+                # エラー情報をファイルに保存
+                with open("tmp/chat_error.txt", "w", encoding="utf-8") as f:
+                    f.write(str(e))
 
         # バックグラウンドでチャット実行開始
-        chat_thread = threading.Thread(target=execute_chat)
+        chat_thread = threading.Thread(target=execute_chat_simple)
         chat_thread.daemon = True
         chat_thread.start()
-
-        # キューからメッセージを取得してセッション状態を更新
-        while True:
-            try:
-                # ノンブロッキングでキューから取得
-                msg_type, msg_data = message_queue.get_nowait()
-
-                if msg_type == "message":
-                    st.session_state.current_analysis["messages"].append(msg_data)
-                elif msg_type == "error":
-                    st.session_state.current_analysis["error"] = msg_data
-                    st.session_state.current_analysis["running"] = False
-                    running_flag.clear()
-                    break
-                elif msg_type == "done":
-                    st.session_state.current_analysis["running"] = False
-                    running_flag.clear()
-                    break
-
-            except queue.Empty:
-                # キューが空の場合は少し待機
-                import time
-
-                time.sleep(0.1)
-                # UIがブロックされないよう、適当なタイミングで一旦UIを更新
-                if len(st.session_state.current_analysis["messages"]) > 0:
-                    break
 
         # 進行状況の表示
         progress_container = st.container()
         with progress_container:
             st.info(
-                "🚀 マルチエージェント分析を開始しました。メッセージが届き次第、下に表示されます。"
+                "🚀 マルチエージェント分析を開始しました。「最新状況を確認」ボタンで進捗を確認できます。"
             )
 
             # 手動更新ボタンと停止ボタン
@@ -394,6 +437,8 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
                 # 常に表示される更新ボタン
                 refresh_clicked = st.button("🔄 最新状況を確認", key="refresh_status")
                 if refresh_clicked:
+                    # 共通関数を使ってファイルからメッセージを読み込み
+                    load_messages_from_file()
                     st.rerun()
 
             with col2:
@@ -401,8 +446,7 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
                     stop_clicked = st.button("⏹️ 分析停止", key="stop_analysis_main")
                     if stop_clicked:
                         st.session_state.current_analysis["running"] = False
-                        running_flag.clear()
-                        st.success("分析を停止しました。")
+                        st.success("分析停止を要求しました。")
                         st.rerun()
                 else:
                     # 分析が完了している場合は無効化されたボタンを表示
@@ -411,12 +455,18 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
                     )
 
             with col3:
+                current_msg_count = len(
+                    st.session_state.current_analysis.get("messages", [])
+                )
                 if st.session_state.current_analysis.get("running"):
-                    st.info(
-                        "⏳ 分析実行中... 「最新状況を確認」ボタンで手動更新できます"
-                    )
+                    st.info(f"⏳ 分析実行中... (受信済み: {current_msg_count} 件)")
                 else:
-                    st.success("✅ 分析完了 - 結果が下に表示されています")
+                    if current_msg_count > 0:
+                        st.success(
+                            f"✅ 分析完了 - {current_msg_count} 件のメッセージを受信"
+                        )
+                    else:
+                        st.warning("⚠️ 分析は完了しましたが、メッセージがありません")
 
     except Exception as e:
         logger.error(f"リアルタイム分析エラー: {str(e)}")
@@ -467,12 +517,14 @@ def get_agent_info(agent_name):
 
 def get_message_type_info(message):
     """メッセージタイプの情報を取得"""
-    # messageの構造を分析してタイプを判定
+    # autogenのメッセージオブジェクトの属性を安全にチェック
+    role = getattr(message, "role", None)
+    tool_calls = getattr(message, "tool_calls", None)
     content = getattr(message, "content", "") or str(message)
 
-    # ツール使用の判定
+    # ツール呼び出しの判定 (tool_calls属性があるか、特定のキーワードがcontentに含まれるか)
     tool_keywords = ["execute_tool", "search_duckduckgo"]
-    if hasattr(message, "models_usage") or any(
+    if (role == "assistant" and tool_calls) or any(
         keyword in content for keyword in tool_keywords
     ):
         return {
@@ -481,17 +533,16 @@ def get_message_type_info(message):
             "label": "ツール使用",
             "color": "#F39C12",
         }
-    # コード実行結果の判定
-    elif any(
-        keyword in content.lower()
-        for keyword in ["実行結果", "result:", "output:", "エラー:", "error:"]
-    ):
+
+    # ツール実行結果の判定 (roleがtoolか、特定のキーワードがcontentに含まれるか)
+    elif role == "tool":
         return {
             "type": "tool_result",
             "icon": "📤",
             "label": "実行結果",
             "color": "#8E44AD",
         }
+
     # 通常の発言
     else:
         return {"type": "message", "icon": "💬", "label": "発言", "color": "#2ECC71"}
@@ -530,28 +581,7 @@ def display_multiagent_chat(messages):
         elif source:
             agent_name = str(source)
         else:
-            # contentから推測を試みる
-            content_lower = content.lower() if content else ""
-            if "planning" in content_lower or "計画" in content or "分解" in content:
-                agent_name = "PlanningAgent"
-            elif any(
-                [
-                    "search" in content_lower,
-                    "検索" in content,
-                    "duckduckgo" in content_lower,
-                ]
-            ):
-                agent_name = "WebSearchAgent"
-            elif any(
-                [
-                    "execute_tool" in content,
-                    "python" in content_lower,
-                    "分析" in content,
-                ]
-            ):
-                agent_name = "DataAnalystAgent"
-            else:
-                agent_name = "システム"
+            agent_name = "システム"  # デフォルトのエージェント名
 
         # エージェント情報を取得
         agent_info = get_agent_info(agent_name)
@@ -684,26 +714,53 @@ def setup_multiagent_team():
         # Reasoner（推論担当）エージェント
         planning_agent = AssistantAgent(
             name="PlanningAgent",
-            description="タスクの計画と管理を行うエージェント",
+            description="タスクの計画と管理と結果の検証を行うエージェント",
             model_client=model_client,
-            system_message="""あなたは計画エージェントです。
-あなたの役割は複雑なタスクを小さな管理可能なサブタスクに分解し、チームメンバーに委任することです。
+            system_message="""
+    You are a planning agent.
+Your job is to break down complex tasks into smaller, manageable subtasks and delegate them to team members. You do not execute tasks or verify results yourself during the planning phase.
+Your team members are:
+    WebSearchAgent: Specializes in information retrieval from the web.
+    DataAnalystAgent: Parses instructions, converts them into mathematical or statistical formulas and Python/SQL code, executes data analysis, and delivers efficient, accurate results.
 
-チームメンバー:
-- WebSearchAgent: ウェブからの情報検索を専門とします
-- DataAnalystAgent: データ分析、Python/SQLコードの実行を行います
+**Planning Phase Instructions**:
+1. Analyze the task and break it into clear, actionable subtasks.
+2. Assign each subtask to the appropriate agent using the format:
+   - 1. <agent> : <task>
+3. For machine learning tasks, ensure the plan includes ALL necessary steps:
+   - Data loading and preprocessing (one-hot encoding, feature engineering)
+   - Model training with proper hyperparameter tuning
+   - Model evaluation and validation
+   - Final prediction for specified conditions
+   - Results summary and interpretation
+4. Make sure to provide enough detail so DataAnalystAgent can complete each step independently.
+5. Your plan should only include task assignments and a description of what will be verified later.
 
-計画フェーズの指示:
-1. タスクを分析し、明確で実行可能なサブタスクに分解する
-2. 各サブタスクを適切なエージェントに割り当てる
-3. 結果を受け取った後の検証プロセスを計画する
+**Verification Phase** (after receiving results):
+- Verify the results against the task requirements.
+- Check that all requested outputs have been provided (e.g., final prediction values).
+- If results are complete and correct, conclude with "TERMINATE".
+- If results are incomplete or incorrect, provide specific, practical feedback to the responsible agent for completion/revisions.
+- DO NOT terminate until the COMPLETE task has been accomplished.
 
-検証フェーズ（結果受け取り後）:
-- タスク要件に対して結果を検証する
-- 結果が正確な場合、"TERMINATE"と発言して終了させてください。
-- 結果が不正確な場合、具体的なフィードバックを提供する
-**Critical Rule**: Do not use or reference the word "TERMINATE" in the planning phase. It is only used after verifying results.
-必ず日本語で回答してください。""",
+**Critical Rule**: Do not use or reference the word "TERMINATE" in the planning phase. It is only used after verifying complete results.
+必ず日本語で回答してください。
+""",
+            #             system_message="""あなたは計画エージェントです。
+            # あなたの役割は複雑なタスクを小さな管理可能なサブタスクに分解し、チームメンバーに委任することです。
+            # チームメンバー:
+            # - WebSearchAgent: ウェブからの情報検索を専門とします
+            # - DataAnalystAgent: データ分析、Python/SQLコードの実行を行います
+            # 計画フェーズの指示:
+            # 1. タスクを分析し、明確で実行可能なサブタスクに分解する
+            # 2. 各サブタスクを適切なエージェントに割り当てる
+            # 3. 結果を受け取った後の検証プロセスを計画する
+            # 検証フェーズ（結果受け取り後）:
+            # - タスク要件に対して結果を検証する
+            # - 結果が正確な場合、人間にわかりやすく結果をサマリして、"TERMINATE"と発言して終了させてください。
+            # - 結果が不正確な場合、具体的なフィードバックを提供する
+            # **Critical Rule**: Do not use or reference the word "TERMINATE" in the planning phase. It is only used after verifying results.
+            # 必ず日本語で回答してください。""",
         )
 
         web_search_agent = AssistantAgent(
