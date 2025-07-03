@@ -10,7 +10,11 @@ import pickle
 
 # ローカルモジュール（現在使用されていないが、将来使用される可能性があるため保持）
 # from utils.database import DataManager
-
+from autogen_agentchat.messages import (
+    TextMessage,
+    ToolCallRequestEvent,
+    ToolCallExecutionEvent,
+)
 from autogen_agentchat.agents import (
     AssistantAgent,
 )
@@ -167,15 +171,21 @@ P2からP18の生産時間は、プロンプトに記載された時間（P2: 10
     if st.button(
         "🚀 マルチエージェント分析を開始",
     ):
-        # 分析開始
-        st.session_state.current_analysis["running"] = True
-        st.session_state.current_analysis["messages"] = []
-        st.session_state.current_analysis["start_time"] = datetime.now()
-        st.session_state.current_analysis["status"] = "実行中"
+        # セッション状態を完全にリセット
+        st.session_state.current_analysis = {
+            "running": True,
+            "messages": [],  # メッセージ配列を空にリセット
+            "start_time": datetime.now(),
+            "status": "実行中",
+            "error": None,  # エラー状態もリセット
+        }
         st.session_state.current_task = task_input  # タスクを保存
 
-        # リアルタイム分析を開始
+        # リアルタイム分析を開始（rerunの前に実行）
         run_realtime_multiagent_analysis(task_input, max_turns, max_messages)
+
+        # 古いメッセージを表示しないようにページをリロード
+        st.rerun()
 
     # 現在の分析状況を表示
     current_analysis = st.session_state.get("current_analysis", {})
@@ -211,24 +221,6 @@ P2からP18の生産時間は、プロンプトに記載された時間（P2: 10
 
             # 履歴に保存
             save_analysis_to_history()
-
-    # # 実行履歴の表示
-    # multiagent_history = st.session_state.get("multiagent_history", [])
-    # if multiagent_history:
-    #     st.subheader("📋 実行履歴")
-    #     for i, record in enumerate(reversed(multiagent_history[-5:])):
-    #         with st.expander(
-    #             f"実行 {len(multiagent_history) - i}: {record['timestamp']}"
-    #         ):
-    #             st.text(f"タスク: {record['task'][:100]}...")
-    #             st.text(f"実行時間: {record['duration']:.1f}秒")
-
-    #             # 履歴にもチャット形式で表示
-    #             if record.get("messages"):
-    #                 st.subheader("💬 エージェント会話履歴")
-    #                 display_multiagent_chat(record["messages"])
-    #             elif record.get("result"):
-    #                 st.text_area("結果", record["result"], height=200)
 
 
 # マルチエージェント関連の関数
@@ -331,11 +323,17 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
         # tmpディレクトリの確保
         os.makedirs("tmp", exist_ok=True)
 
-        # 以前のファイルをクリーンアップ
+        # 以前のファイルを確実にクリーンアップ
         for file_name in ["chat_messages.pkl", "chat_completed.txt", "chat_error.txt"]:
             file_path = f"tmp/{file_name}"
-            if os.path.exists(file_path):
-                os.remove(file_path)
+            try:
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    logger.info(f"一時ファイルを削除しました: {file_path}")
+            except Exception as e:
+                logger.warning(
+                    f"一時ファイルの削除に失敗しました: {file_path} - {str(e)}"
+                )
 
         # チームセットアップ
         chat = setup_multiagent_team()
@@ -508,45 +506,82 @@ def get_agent_info(agent_name):
 
 
 def get_message_type_info(message):
-    """メッセージタイプの情報を取得"""
-    # autogenのメッセージオブジェクトの属性を安全にチェック
-    role = getattr(message, "role", None)
-    tool_calls = getattr(message, "tool_calls", None)
-    content = getattr(message, "content", "") or str(message)
-
-    # ツール呼び出しの判定 (tool_calls属性があるか、特定のキーワードがcontentに含まれるか)
-    tool_keywords = ["execute_tool", "search_duckduckgo"]
-    if (role == "assistant" and tool_calls) or any(
-        keyword in content for keyword in tool_keywords
-    ):
+    if isinstance(message, TextMessage):
+        """メッセージタイプの情報を取得"""
         return {
-            "type": "tool_use",
+            "type": "text",
+            "icon": "💬",
+            "label": "テキストメッセージ",
+            "color": "#2ECC71",
+        }
+    elif isinstance(message, ToolCallRequestEvent):
+
+        """ツール呼び出しの情報を取得"""
+        return {
+            "type": "tool_call",
             "icon": "🔧",
-            "label": "ツール使用",
+            "label": "ツール呼び出し",
             "color": "#F39C12",
         }
-
-    # ツール実行結果の判定 (roleがtool)
-    elif role == "tool":
+    elif isinstance(message, ToolCallExecutionEvent):
+        """ツール実行結果の情報を取得"""
         return {
             "type": "tool_result",
             "icon": "📤",
-            "label": "実行結果",
+            "label": "ツール実行結果",
             "color": "#8E44AD",
         }
-
-    # 通常の発言
     else:
-        return {"type": "message", "icon": "💬", "label": "発言", "color": "#2ECC71"}
+        return {
+            "type": "unknown",
+            "icon": "❓",
+            "label": "不明なメッセージ",
+            "color": "#95A5A6",
+        }
+    # """メッセージタイプの情報を取得"""
+    # # autogenのメッセージオブジェクトの属性を安全にチェック
+    # role = getattr(message, "role", None)
+    # tool_calls = getattr(message, "tool_calls", None)
+    # content = getattr(message, "content", "") or str(message)
+
+    # # ツール呼び出しの判定 (tool_calls属性があるか、特定のキーワードがcontentに含まれるか)
+    # tool_keywords = ["execute_tool", "search_duckduckgo"]
+    # if (role == "assistant" and tool_calls) or any(
+    #     keyword in content for keyword in tool_keywords
+    # ):
+    #     return {
+    #         "type": "tool_use",
+    #         "icon": "🔧",
+    #         "label": "ツール使用",
+    #         "color": "#F39C12",
+    #     }
+
+    # # ツール実行結果の判定 (roleがtool)
+    # elif role == "tool":
+    #     return {
+    #         "type": "tool_result",
+    #         "icon": "📤",
+    #         "label": "実行結果",
+    #         "color": "#8E44AD",
+    #     }
+
+    # # 通常の発言
+    # else:
+    #     return {"type": "message", "icon": "💬", "label": "発言", "color": "#2ECC71"}
 
 
 def display_multiagent_chat(messages):
     """マルチエージェントの会話をチャット形式で表示"""
-    if not messages:
-        st.info("会話履歴がありません。")
+    # 実行中でない場合は表示をスキップ
+    if not st.session_state.current_analysis.get("running", False) and not messages:
         return
 
     st.markdown("### 💬 エージェント会話")
+
+    # メッセージが空の場合
+    if not messages:
+        st.info("💬 分析を開始しました。メッセージが表示されるまでお待ちください...")
+        return
 
     # メッセージ数の表示
     st.info(f"📊 総メッセージ数: {len(messages)}")
