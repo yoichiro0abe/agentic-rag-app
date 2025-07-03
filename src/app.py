@@ -1,6 +1,15 @@
 import streamlit as st
 import os
 import sys
+import logging
+
+logging.basicConfig(
+    level=logging.WARNING,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
 
 # 現在のディレクトリをパスに追加
 current_dir = os.path.dirname(os.path.abspath(__file__))

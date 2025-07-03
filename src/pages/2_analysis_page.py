@@ -3,34 +3,22 @@ import streamlit as st
 import os
 import asyncio
 import logging
-import concurrent.futures
 from datetime import datetime
 import threading
 import pickle
 
-# ローカルモジュール（現在使用されていないが、将来使用される可能性があるため保持）
+# ローカルモジュール
+import utils  # utilsモジュールをインポート
+
 # from utils.database import DataManager
 from autogen_agentchat.messages import (
     TextMessage,
     ToolCallRequestEvent,
     ToolCallExecutionEvent,
 )
-from autogen_agentchat.agents import (
-    AssistantAgent,
-)
-from autogen_agentchat.teams import SelectorGroupChat
 from autogen_agentchat.conditions import TextMentionTermination, MaxMessageTermination
-from autogen_core.models import ModelInfo
-from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
-from duckduckgo_search import DDGS
-from autogen_ext.code_executors.local import LocalCommandLineCodeExecutor
-from autogen_ext.tools.code_execution import PythonCodeExecutionTool
-from dotenv import load_dotenv
 
-logging.basicConfig(
-    level=logging.WARNING,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-)
+
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -336,7 +324,7 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
                 )
 
         # チームセットアップ
-        chat = setup_multiagent_team()
+        chat = utils.autogen_agent.setup_multiagent_team()
         if not chat:
             st.error("チームのセットアップに失敗しました")
             st.session_state.current_analysis["running"] = False
@@ -538,36 +526,6 @@ def get_message_type_info(message):
             "label": "不明なメッセージ",
             "color": "#95A5A6",
         }
-    # """メッセージタイプの情報を取得"""
-    # # autogenのメッセージオブジェクトの属性を安全にチェック
-    # role = getattr(message, "role", None)
-    # tool_calls = getattr(message, "tool_calls", None)
-    # content = getattr(message, "content", "") or str(message)
-
-    # # ツール呼び出しの判定 (tool_calls属性があるか、特定のキーワードがcontentに含まれるか)
-    # tool_keywords = ["execute_tool", "search_duckduckgo"]
-    # if (role == "assistant" and tool_calls) or any(
-    #     keyword in content for keyword in tool_keywords
-    # ):
-    #     return {
-    #         "type": "tool_use",
-    #         "icon": "🔧",
-    #         "label": "ツール使用",
-    #         "color": "#F39C12",
-    #     }
-
-    # # ツール実行結果の判定 (roleがtool)
-    # elif role == "tool":
-    #     return {
-    #         "type": "tool_result",
-    #         "icon": "📤",
-    #         "label": "実行結果",
-    #         "color": "#8E44AD",
-    #     }
-
-    # # 通常の発言
-    # else:
-    #     return {"type": "message", "icon": "💬", "label": "発言", "color": "#2ECC71"}
 
 
 def display_multiagent_chat(messages):
@@ -695,182 +653,6 @@ def display_multiagent_chat(messages):
 
             # 区切り線
             st.markdown("---")
-
-
-def search_duckduckgo(query: str) -> str:
-    """DuckDuckGo検索関数"""
-    try:
-        print(f"[llm_agent] DuckDuckGo検索ツールを使用: query='{query}'")
-        with DDGS() as ddgs:
-            results = ddgs.text(query)
-            return "\n".join([f"{r['title']}: {r['body']}" for r in results[:3]])
-    except Exception as e:
-        return f"検索エラー: {str(e)}"
-
-
-def setup_multiagent_team():
-    """マルチエージェントチームのセットアップ"""
-    try:
-        # 環境変数の読み込み
-        load_dotenv("./.env_o4mini", override=True)
-
-        # LLM設定（Azure OpenAI）
-        model_info = ModelInfo(
-            vision=False,
-            function_calling=True,
-            json_output=False,
-            family="unknown",
-            structured_output=True,
-        )
-        logger.info(
-            f"""Azure OpenAIモデル情報: {model_info} AZURE_AI_AGENT_ENDPOINT=
-                    {os.environ.get('AZURE_AI_AGENT_ENDPOINT')}  AZURE_API_KEY=
-                    {os.environ.get('AZURE_API_KEY')} AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME=
-                    {os.environ.get('AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME')} AZURE_API_VERSION=
-                    {os.environ.get('AZURE_API_VERSION')}"""
-        )
-
-        model_client = AzureOpenAIChatCompletionClient(
-            azure_endpoint=os.environ.get("AZURE_AI_AGENT_ENDPOINT"),
-            api_key=os.environ.get("AZURE_API_KEY"),
-            model=os.environ.get("AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME"),
-            api_version=os.environ.get("AZURE_API_VERSION"),
-            model_info=model_info,
-        )
-
-        # Reasoner（推論担当）エージェント
-        planning_agent = AssistantAgent(
-            name="PlanningAgent",
-            description="タスクの計画と管理と結果の検証を行うエージェント",
-            model_client=model_client,
-            system_message="""
-    You are a planning agent.
-Your job is to break down complex tasks into smaller, manageable subtasks and delegate them to team members. You do not execute tasks or verify results yourself during the planning phase.
-Your team members are:
-    WebSearchAgent: Specializes in information retrieval from the web.
-    DataAnalystAgent: Parses instructions, converts them into mathematical or statistical formulas and Python/SQL code, executes data analysis, and delivers efficient, accurate results.
-
-**Planning Phase Instructions**:
-1. Analyze the task and break it into clear, actionable subtasks.
-2. Assign each subtask to the appropriate agent using the format:
-   - 1. <agent> : <task>
-3. For machine learning tasks, ensure the plan includes ALL necessary steps:
-   - Data loading and preprocessing (one-hot encoding, feature engineering)
-   - Model training with proper hyperparameter tuning
-   - Model evaluation and validation
-   - Final prediction for specified conditions
-   - Results summary and interpretation
-4. Make sure to provide enough detail so DataAnalystAgent can complete each step independently.
-5. Your plan should only include task assignments and a description of what will be verified later.
-
-**Verification Phase** (after receiving results):
-- Verify the results against the task requirements.
-- Check that all requested outputs have been provided (e.g., final prediction values).
-- If results are complete and correct, conclude with "TERMINATE".
-- If results are incomplete or incorrect, provide specific, practical feedback to the responsible agent for completion/revisions.
-- DO NOT terminate until the COMPLETE task has been accomplished.
-
-**Critical Rule**: Do not use or reference the word "TERMINATE" in the planning phase. It is only used after verifying complete results.
-必ず日本語で回答してください。
-""",
-            #             system_message="""あなたは計画エージェントです。
-            # あなたの役割は複雑なタスクを小さな管理可能なサブタスクに分解し、チームメンバーに委任することです。
-            # チームメンバー:
-            # - WebSearchAgent: ウェブからの情報検索を専門とします
-            # - DataAnalystAgent: データ分析、Python/SQLコードの実行を行います
-            # 計画フェーズの指示:
-            # 1. タスクを分析し、明確で実行可能なサブタスクに分解する
-            # 2. 各サブタスクを適切なエージェントに割り当てる
-            # 3. 結果を受け取った後の検証プロセスを計画する
-            # 検証フェーズ（結果受け取り後）:
-            # - タスク要件に対して結果を検証する
-            # - 結果が正確な場合、人間にわかりやすく結果をサマリして、"TERMINATE"と発言して終了させてください。
-            # - 結果が不正確な場合、具体的なフィードバックを提供する
-            # **Critical Rule**: Do not use or reference the word "TERMINATE" in the planning phase. It is only used after verifying results.
-            # 必ず日本語で回答してください。""",
-        )
-
-        web_search_agent = AssistantAgent(
-            "WebSearchAgent",
-            description="ウェブ検索を行うエージェント",
-            tools=[search_duckduckgo],
-            model_client=model_client,
-            system_message="""あなたはウェブ検索エージェントです。
-search_duckduckgoツールを使用して情報を検索します。
-一度に1回の検索を行い、結果に基づいた計算は行いません。
-必ず日本語で回答してください。""",
-        )
-
-        execute_tool = PythonCodeExecutionTool(
-            LocalCommandLineCodeExecutor(
-                timeout=300, work_dir="tmp", cleanup_temp_files=False
-            ),
-        )
-
-        data_analyst_agent = AssistantAgent(
-            name="DataAnalystAgent",
-            model_client=model_client,
-            description="データ分析を行うエージェント",
-            system_message="""あなたはデータ分析エージェントです。ReActフレームワーク（推論と行動）を使用してタスクを実行します。
-
-各ターンで以下の形式に従ってください：
-思考: [問題の分析、解決へのアプローチ]
-行動: execute_tool([Pythonコード])
-観察: [コード実行の結果]
-思考: [結果の解釈と次のステップ]
-
-複雑な問題を小さなステップに分解します。
-コードを書く際は目的を明確にします。
-実行結果を詳細に分析し、次の行動につなげます。
-データが見えない場合は、必要なデータを明確に求めます。
-必ず日本語で回答してください。""",
-            tools=[execute_tool],
-            reflect_on_tool_use=True,
-        )
-
-        selector_prompt = """会話の状況に応じて次のタスクを実行する role を選択することです。
-## 次の話者の選択ルール
-
-各 role の概要は以下です。
-{roles}
-次のタスクに選択可能な participants は以下です。
-
-{participants}
-
-以下のルールに従って、次のを選択してください。
-
-- 会話履歴を確認し、次の会話に最適な role を選択します。role name のみを返してください。
-- role は1つだけ選択してください。
-- 他の role が作業を開始する前に、"PlanningAgent" にタスクを割り当て、サブタスクを計画してもらうことが必要です。
-  - PlanningAgent はサブタスクの計画のみを行います。サブタスクの作業を依頼してはいけません。
-- PlanningAgent が計画したサブタスクに応じて、role を選択します。
-- タスクを完了するための必要な情報が揃ったと判断したら "PlanningAgent" に最終回答の作成を依頼します。
-
-## 会話履歴
-
-{history}
-"""
-
-        text_mention_termination = TextMentionTermination("TERMINATE")
-        max_messages_termination = MaxMessageTermination(max_messages=10)
-        termination = text_mention_termination | max_messages_termination
-
-        # グループチャット構成
-        chat = SelectorGroupChat(
-            participants=[planning_agent, web_search_agent, data_analyst_agent],
-            model_client=model_client,
-            termination_condition=termination,
-            max_turns=20,
-            allow_repeated_speaker=False,
-            selector_prompt=selector_prompt,
-        )
-
-        return chat
-
-    except Exception as e:
-        logger.error(f"マルチエージェントチームのセットアップ中にエラー: {str(e)}")
-        st.error(f"マルチエージェントチームのセットアップエラー: {str(e)}")
-        return None
 
 
 # このページが直接実行された場合
