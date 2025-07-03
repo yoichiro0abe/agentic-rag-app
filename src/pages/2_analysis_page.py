@@ -143,7 +143,7 @@ P2からP18の生産時間は、プロンプトに記載された時間（P2: 10
 商品の生産の順番は自由に入れ替えて構いません。
 
 変更後のスケジュールのP1の生産時間を述べてください。
-変更後のスケジュールを元のCSV形式と同じ形で提示してください""",
+変更後のスケジュールをマークダウン形式で提示してください""",
         "カスタムタスク": "",
     }
 
@@ -159,9 +159,9 @@ P2からP18の生産時間は、プロンプトに記載された時間（P2: 10
     # 実行設定
     col1, col2 = st.columns(2)
     with col1:
-        max_turns = st.slider("最大ターン数", 5, 50, 20)
+        max_turns = st.slider("最大ターン数", 5, 50, 15)
     with col2:
-        max_messages = st.slider("最大メッセージ数", 5, 50, 10)
+        max_messages = st.slider("最大メッセージ数", 5, 50, 15)
 
     # 実行ボタン
     if st.button(
@@ -360,7 +360,7 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
 
                 async def run_chat():
                     message_count = 0
-                    messages_buffer = []  # バッファーに一時保存
+                    messages_buffer = []
                     try:
                         async for message in chat.run_stream(task=task_input):
                             # セッション状態の安全な確認
@@ -373,42 +373,34 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
                                 break
 
                             message_count += 1
-                            # バッファーに追加（別スレッドから直接セッション状態にアクセスしない）
                             messages_buffer.append(message)
 
-                            # ログ出力
-                            logger.info(
-                                f"リアルタイムメッセージ受信・バッファ保存: {message_count} 件目"
-                            )
+                            # メッセージを受信するたびにファイルに保存
+                            try:
+                                with open("tmp/chat_messages.pkl", "wb") as f:
+                                    pickle.dump(messages_buffer, f)
+                                logger.info(
+                                    f"リアルタイムメッセージ保存: {message_count} 件目"
+                                )
+                            except Exception as save_error:
+                                logger.error(
+                                    f"メッセージのリアルタイム保存エラー: {str(save_error)}"
+                                )
 
                             # 少し待機（UI更新のため）
                             await asyncio.sleep(0.1)
 
                     except Exception as e:
                         logger.error(f"チャット実行中エラー: {str(e)}")
-                        # エラー情報をファイルに保存（セッション状態にアクセス不可のため）
                         with open("tmp/chat_error.txt", "w", encoding="utf-8") as f:
                             f.write(str(e))
                     finally:
-                        # 完了時にメッセージをファイルに保存
-                        try:
-                            import pickle
-
-                            # メッセージをpickleで保存（オブジェクトの状態を保持）
-                            with open("tmp/chat_messages.pkl", "wb") as f:
-                                pickle.dump(messages_buffer, f)
-
-                            # 完了フラグを作成
-                            with open(
-                                "tmp/chat_completed.txt", "w", encoding="utf-8"
-                            ) as f:
-                                f.write(f"completed:{message_count}")
-
-                            logger.info(
-                                f"チャット実行完了。総メッセージ数: {message_count}"
-                            )
-                        except Exception as save_error:
-                            logger.error(f"メッセージ保存エラー: {str(save_error)}")
+                        # 完了フラグを作成
+                        with open("tmp/chat_completed.txt", "w", encoding="utf-8") as f:
+                            f.write(f"completed:{message_count}")
+                        logger.info(
+                            f"チャット実行完了。総メッセージ数: {message_count}"
+                        )
 
                 loop.run_until_complete(run_chat())
 
@@ -534,7 +526,7 @@ def get_message_type_info(message):
             "color": "#F39C12",
         }
 
-    # ツール実行結果の判定 (roleがtoolか、特定のキーワードがcontentに含まれるか)
+    # ツール実行結果の判定 (roleがtool)
     elif role == "tool":
         return {
             "type": "tool_result",
@@ -814,10 +806,10 @@ search_duckduckgoツールを使用して情報を検索します。
 
 - 会話履歴を確認し、次の会話に最適な role を選択します。role name のみを返してください。
 - role は1つだけ選択してください。
-- 他の role が作業を開始する前に、"PlannerAgent" にタスクを割り当て、サブタスクを計画してもらうことが必要です。
-  - PlannerAgent はサブタスクの計画のみを行います。サブタスクの作業を依頼してはいけません。
-- PlannerAgent が計画したサブタスクに応じて、role を選択します。
-- タスクを完了するための必要な情報が揃ったと判断したら "SummaryAgent" に最終回答の作成を依頼します。
+- 他の role が作業を開始する前に、"PlanningAgent" にタスクを割り当て、サブタスクを計画してもらうことが必要です。
+  - PlanningAgent はサブタスクの計画のみを行います。サブタスクの作業を依頼してはいけません。
+- PlanningAgent が計画したサブタスクに応じて、role を選択します。
+- タスクを完了するための必要な情報が揃ったと判断したら "PlanningAgent" に最終回答の作成を依頼します。
 
 ## 会話履歴
 
@@ -844,91 +836,6 @@ search_duckduckgoツールを使用して情報を検索します。
         logger.error(f"マルチエージェントチームのセットアップ中にエラー: {str(e)}")
         st.error(f"マルチエージェントチームのセットアップエラー: {str(e)}")
         return None
-
-
-async def run_multiagent_chat(chat, task):
-    """マルチエージェントチャットの実行（非推奨 - run_multiagent_analysisを使用してください）"""
-    # この関数は後方互換性のために残していますが、使用されません
-    pass
-
-
-def run_multiagent_analysis(task_input, max_turns, max_messages):
-    """マルチエージェント分析のメイン実行関数"""
-    try:
-        start_time = datetime.now()
-
-        # チームセットアップ
-        chat = setup_multiagent_team()
-        if not chat:
-            return "チームのセットアップに失敗しました"
-
-        # 最大ターン数とメッセージ数を更新
-        chat.max_turns = max_turns
-        chat.termination_condition = TextMentionTermination(
-            "TERMINATE"
-        ) | MaxMessageTermination(max_messages=max_messages)
-
-        # 同期的にマルチエージェントチャットを実行
-        def run_sync_multiagent_chat():
-            """同期実行のためのラッパー関数"""
-
-            async def async_chat():
-                try:
-                    messages = []
-                    async for message in chat.run_stream(task=task_input):
-                        messages.append(message)
-                        # 進行状況をログに出力
-                        logger.info(f"メッセージ受信: {len(messages)} 件目")
-                    return messages
-                except Exception as e:
-                    logger.error(f"チャット実行エラー: {str(e)}")
-                    raise e
-
-            # 新しいイベントループで実行
-            return asyncio.run(async_chat())
-
-        # ThreadPoolExecutorを使用して非同期処理を実行
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future = executor.submit(run_sync_multiagent_chat)
-            try:
-                messages = future.result(timeout=300)  # 5分タイムアウト
-            except concurrent.futures.TimeoutError:
-                st.error("処理がタイムアウトしました（5分）")
-                return "タイムアウトエラー"
-            except Exception as e:
-                st.error(f"実行エラー: {str(e)}")
-                return f"実行エラー: {str(e)}"
-
-        end_time = datetime.now()
-        duration = (end_time - start_time).total_seconds()
-
-        # 結果をセッション状態に保存
-        if "multiagent_history" not in st.session_state:
-            st.session_state.multiagent_history = []
-
-        result_summary = f"分析完了 ({len(messages) if messages else 0} メッセージ)"
-
-        st.session_state.multiagent_history.append(
-            {
-                "timestamp": start_time.strftime("%Y-%m-%d %H:%M:%S"),
-                "task": task_input,
-                "duration": duration,
-                "result": result_summary,
-                "messages": messages,
-            }
-        )
-
-        return {
-            "duration": duration,
-            "message_count": len(messages) if messages else 0,
-            "messages": messages,
-            "summary": result_summary,
-        }
-
-    except Exception as e:
-        logger.error(f"マルチエージェント分析エラー: {str(e)}")
-        st.error(f"マルチエージェント分析エラー: {str(e)}")
-        return f"エラー: {str(e)}"
 
 
 # このページが直接実行された場合
