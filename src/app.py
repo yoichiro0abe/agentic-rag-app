@@ -96,9 +96,7 @@ def main():
     else:
         # サイドバーにログアウトボタンを追加
         with st.sidebar:
-            if st.button("🚪 ログアウト", use_container_width=True):
-                authenticator.logout("ログアウト", "sidebar")
-                st.rerun()
+            authenticator.logout("🚪 ログアウト", "sidebar")
 
         # 統計情報を表示
         display_statistics()  # ページナビゲーションの設定（絶対パスを使用）
