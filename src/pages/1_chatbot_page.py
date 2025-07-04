@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 import sys
+import re
 from utils.database import DataManager
 from utils.autogen_agent import setup_agent
 import logging
@@ -15,6 +16,26 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
+
+
+def display_message_with_images(content: str):
+    """メッセージ内の画像パスを検出し、画像とテキストを表示する"""
+    # [image: path/to/image.png] 形式のタグを検出
+    image_pattern = r"\[image: (.*?)\]"
+
+    # メッセージを画像タグで分割
+    parts = re.split(image_pattern, content)
+
+    for i, part in enumerate(parts):
+        if i % 2 == 1:  # 奇数番目の要素が画像パス
+            image_path = part
+            if os.path.exists(image_path):
+                st.image(image_path)
+            else:
+                st.warning(f"画像ファイルが見つかりません: {image_path}")
+        else:  # 偶数番目の要素がテキスト
+            if part.strip():
+                st.markdown(part)
 
 
 def save_current_chat():
@@ -88,7 +109,7 @@ def enhanced_chatbot_page():
                 st.markdown(message["content"])
         else:
             with st.chat_message("assistant"):
-                st.markdown(message["content"])
+                display_message_with_images(message["content"])
 
     # ユーザー入力
     if prompt := st.chat_input("メッセージを入力してください..."):
@@ -126,7 +147,7 @@ def enhanced_chatbot_page():
                                             st.markdown(content)
                                     else:
                                         with st.chat_message("assistant"):
-                                            st.markdown(content)
+                                            display_message_with_images(content)
 
                         # イベントループで実行
                         import asyncio as _asyncio
@@ -145,7 +166,7 @@ def enhanced_chatbot_page():
                 {"role": "assistant", "content": response}
             )
             with st.chat_message("assistant"):
-                st.markdown(response)
+                display_message_with_images(response)
 
         # チャット履歴を保存
         save_current_chat()

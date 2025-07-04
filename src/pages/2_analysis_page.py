@@ -3,6 +3,7 @@ import streamlit as st
 import os
 import asyncio
 import logging
+import re
 from datetime import datetime
 import threading
 import pickle
@@ -528,6 +529,37 @@ def get_message_type_info(message):
         }
 
 
+def display_message_with_images_for_analysis(content):
+    """分析ページ用に、メッセージ内の画像パスを検出し、画像とテキストを表示する"""
+    image_pattern = r"\[image: (.*?)\]"
+
+    # メッセージを画像タグで分割
+    parts = re.split(image_pattern, content)
+
+    for i, part in enumerate(parts):
+        if i % 2 == 1:  # 奇数番目の要素が画像パス
+            image_path = part
+            if os.path.exists(image_path):
+                st.image(image_path)
+            else:
+                st.warning(f"画像ファイルが見つかりません: {image_path}")
+        else:  # 偶数番目の要素がテキスト
+            text_part = part.strip()
+            if text_part:
+                # 内容を見やすく表示
+                if len(text_part) > 1000:
+                    st.text_area("メッセージ内容", text_part, height=200, disabled=True)
+                elif any(
+                    keyword in text_part
+                    for keyword in ["```", "def ", "import ", "print("]
+                ):
+                    # コードっぽい内容の場合
+                    st.code(text_part, language="python")
+                else:
+                    # 通常のテキスト
+                    st.markdown(text_part)
+
+
 def display_multiagent_chat(messages):
     """マルチエージェントの会話をチャット形式で表示"""
     # 実行中でない場合は表示をスキップ
@@ -612,19 +644,7 @@ def display_multiagent_chat(messages):
                 f"詳細を表示 - {preview_text}{'...' if len(content) > 100 else ''}",
                 expanded=False,
             ):
-                # 内容を見やすく表示
-                if len(content) > 1000:
-                    st.text_area("メッセージ内容", content, height=200, disabled=True)
-                elif any(
-                    keyword in content
-                    for keyword in ["```", "def ", "import ", "print("]
-                ):
-                    # コードっぽい内容の場合
-                    st.code(content, language="python")
-                else:
-                    # 通常のテキスト
-                    st.markdown(content)
-
+                display_message_with_images_for_analysis(content)
                 # メッセージの詳細情報
                 with st.container():
                     st.markdown("**📝 メッセージ詳細:**")
