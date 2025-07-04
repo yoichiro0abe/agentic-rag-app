@@ -50,8 +50,7 @@ def main():
         st.markdown(
             """
             <style>
-                .css-1d391kg {display: none}
-                .css-1rs6os {display: none}
+                /* サイドバーのみ非表示に */
                 section[data-testid="stSidebar"] {display: none}
                 .stSidebar {display: none}
             </style>
@@ -94,9 +93,6 @@ def main():
                 if "username" in st.session_state:
                     del st.session_state["username"]
                 st.rerun()
-        else:
-            # login()がNoneを返した場合（通常は初回表示時）
-            return
     else:
         # サイドバーにログアウトボタンを追加
         with st.sidebar:
