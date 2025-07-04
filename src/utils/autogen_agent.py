@@ -11,7 +11,13 @@ from dotenv import load_dotenv
 import logging
 import os
 from duckduckgo_search import DDGS
+import sys
+import asyncio
 
+if sys.platform == "win32":
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+# ローカルモジュールのインポート
+from .tools import upload_file_to_blob
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -132,9 +138,20 @@ search_duckduckgoツールを使用して情報を検索します。
 コードを書く際は目的を明確にします。
 実行結果を詳細に分析し、次の行動につなげます。
 データが見えない場合は、必要なデータをユーザに求めます。
-グラフを生成する場合は、`matplotlib`や`seaborn`を使い、`tmp`ディレクトリに画像ファイル（例: `tmp/my_graph.png`）として保存してください。保存後、そのファイルパスを `[image: tmp/my_graph.png]` のような形式で明確にメッセージに含めてください。
+**重要**: ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
+**グラフ生成とアップロードのルール:**
+1.  **思考**: まず、グラフを保存するファイル名を決めます。（例: `my_graph.png`）
+2.  **行動 (コード実行)**: `execute_tool`を使い、Pythonコードで `img` ディレクトリを作成し、そこにグラフを保存します（例: `import os; os.makedirs('img', exist_ok=True); plt.savefig('img/my_graph.png')`）。ファイルは `tmp/img/` ディレクトリに保存されます。
+3.  **観察**: コード実行が成功し、ファイルが作成されたことを確認します。
+4.  **行動 (アップロード)**: `upload_image_to_blob`ツールを呼び出し、`tmp/img/` を先頭に付けたパス（例: `tmp/img/my_graph.png`）で画像をアップロードします。
+5.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
+6.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
+matplotlibで日本語グラフを作成する際は、日本語フォントの設定が必要です。以下のコードを実行して、日本語フォントを設定してください。
+'''
+plt.rcParams["font.family"] = "IPAexGothic"
+'''
 必ず日本語で回答してください。""",
-            tools=[execute_tool],
+            tools=[execute_tool, upload_image_to_blob],
             reflect_on_tool_use=True,
         )
 
@@ -244,20 +261,52 @@ def setup_agent():
 2. 実行計画を立てる（必要ならユーザーに確認）
 3. 計画に従ってツールを使って実行する
 4. 結果を評価し、成功か失敗かを判断する
+   **重要**: ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
 5. 失敗した場合は原因を分析し、改善策を立てて再実行する
 6. 成功したら次のステップに進むか、完了を報告する
 
-グラフを生成する場合は、`matplotlib`や`seaborn`を使い、`tmp`ディレクトリに画像ファイル（例: `tmp/my_graph.png`）として保存してください。保存後、そのファイルパスを `[image: tmp/my_graph.png]` のような形式で明確にメッセージに含めてください。
-常にユーザーに進捗を共有し、必要に応じて質問してください。""",
-            tools=[execute_tool],
+**グラフ生成とアップロードのルール:**
+1.  **思考**: まず、グラフを保存するファイル名を決めます。（例: `{yyyymmdd-hhmmss}.png`）
+2.  **行動 (コード実行)**: `execute_tool`を使い、
+3.  **観察**: コード実行が成功し、ファイルが作成されたことを確認します。
+4.  **行動 (アップロード)**: `upload_image_to_blob`ツールを呼び出し、`tmp/` を先頭に付けたパス（例: `tmp/{yyyymmdd-hhmmss}.png`）で画像をアップロードします。
+5.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
+6.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
+matplotlibで日本語グラフを作成する際は、日本語フォントの設定が必要です。以下のコードを実行して、日本語フォントを設定してください。
+'''
+plt.rcParams["font.family"] = "IPAexGothic"
+'''
+        必ず日本語で回答してください。""",
+            tools=[execute_tool, upload_image_to_blob],
             reflect_on_tool_use=True,
         )
 
         return data_analyst_agent
 
     except Exception as e:
-        logger.error(f"マルチエージェントチームのセットアップ中にエラー: {str(e)}")
+        logger.error(f"エージェントのセットアップ中にエラー: {str(e)}")
         return None
+
+
+def upload_image_to_blob(file_path: str) -> str:
+    """
+    指定されたローカルファイルパスの画像をAzure Blob Storageにアップロードし、その公開URLを返します。
+    グラフをローカルに保存した後にこのツールを呼び出して、画像をクラウドにアップロードしてください。
+    例: upload_image_to_blob('tmp/img/my_graph.png')
+    """
+    if not os.path.exists(file_path):
+        return f"エラー: ファイルが見つかりません {file_path}"
+
+    url = upload_file_to_blob(file_path)
+
+    # アップロード後にローカルファイルを削除
+    try:
+        os.remove(file_path)
+        logger.info(f"ローカルファイルを削除しました: {file_path}")
+    except Exception as e:
+        logger.warning(f"ローカルファイルの削除に失敗しました {file_path}: {e}")
+
+    return f"画像のアップロードに成功しました。URL: {url}"
 
 
 def search_duckduckgo(query: str) -> str:

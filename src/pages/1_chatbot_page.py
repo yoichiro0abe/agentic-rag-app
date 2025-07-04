@@ -28,11 +28,14 @@ def display_message_with_images(content: str):
 
     for i, part in enumerate(parts):
         if i % 2 == 1:  # 奇数番目の要素が画像パス
-            image_path = part
-            if os.path.exists(image_path):
+            image_path = part.strip()
+            # URLかローカルパスかを判定
+            if image_path.startswith("http"):
+                st.image(image_path)
+            elif os.path.exists(image_path):
                 st.image(image_path)
             else:
-                st.warning(f"画像ファイルが見つかりません: {image_path}")
+                st.warning(f"画像ファイルまたはURLが見つかりません: {image_path}")
         else:  # 偶数番目の要素がテキスト
             if part.strip():
                 st.markdown(part)
@@ -135,6 +138,13 @@ def enhanced_chatbot_page():
                             async for msg in agent.run_stream(task=prompt):
                                 logger.info(f"Received message: {msg}")
                                 content = getattr(msg, "content", "")
+                                # contentがJSONシリアライズ不可能なオブジェクトの場合、文字列に変換
+                                # FunctionCallオブジェクトなどが含まれるリストを安全に処理するため
+                                if not isinstance(
+                                    content, (str, int, float, bool, type(None))
+                                ):
+                                    content = str(content)
+
                                 if content != "":
                                     role = getattr(msg, "source", "assistant")
                                     response_chunks.append(content)

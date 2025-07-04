@@ -538,11 +538,14 @@ def display_message_with_images_for_analysis(content):
 
     for i, part in enumerate(parts):
         if i % 2 == 1:  # 奇数番目の要素が画像パス
-            image_path = part
-            if os.path.exists(image_path):
+            image_path = part.strip()
+            # URLかローカルパスかを判定
+            if image_path.startswith("http"):
+                st.image(image_path)
+            elif os.path.exists(image_path):
                 st.image(image_path)
             else:
-                st.warning(f"画像ファイルが見つかりません: {image_path}")
+                st.warning(f"画像ファイルまたはURLが見つかりません: {image_path}")
         else:  # 偶数番目の要素がテキスト
             text_part = part.strip()
             if text_part:
