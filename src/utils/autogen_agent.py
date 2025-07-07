@@ -118,7 +118,9 @@ search_duckduckgoツールを使用して情報を検索します。
 
         execute_tool = PythonCodeExecutionTool(
             LocalCommandLineCodeExecutor(
-                timeout=300, work_dir="tmp", cleanup_temp_files=False
+                timeout=300,
+                work_dir="C:/agent-work",
+                cleanup_temp_files=False,
             ),
         )
 
@@ -140,12 +142,11 @@ search_duckduckgoツールを使用して情報を検索します。
 データが見えない場合は、必要なデータをユーザに求めます。
 **重要**: ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
 **グラフ生成とアップロードのルール:**
-1.  **思考**: まず、グラフを保存するファイル名を決めます。（例: `my_graph.png`）
-2.  **行動 (コード実行)**: `execute_tool`を使い、Pythonコードで `img` ディレクトリを作成し、そこにグラフを保存します（例: `import os; os.makedirs('img', exist_ok=True); plt.savefig('img/my_graph.png')`）。ファイルは `tmp/img/` ディレクトリに保存されます。
-3.  **観察**: コード実行が成功し、ファイルが作成されたことを確認します。
-4.  **行動 (アップロード)**: `upload_image_to_blob`ツールを呼び出し、`tmp/img/` を先頭に付けたパス（例: `tmp/img/my_graph.png`）で画像をアップロードします。
-5.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
-6.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
+1.  **思考**: まず、グラフを保存するファイル名を決めます。（例: `{yyyymmdd-hhMMss}.png`）
+2.  **行動 (コード実行)**: `execute_tool`を使い、Pythonコードで `img` ディレクトリを作成し、そこにグラフを保存します（例: `import os; os.makedirs('img', exist_ok=True); plt.savefig('img/my_graph.png')`）。
+ `upload_image_to_blob`ツールを呼び出し、`C:/agent-work/` を先頭に付けたパス（例: `C:/agent-work/img/{yyyymmdd-hhMMss}.png`）で画像をアップロードします。
+3.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
+4.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
 matplotlibで日本語グラフを作成する際は、日本語フォントの設定が必要です。以下のコードを実行して、日本語フォントを設定してください。
 '''
 plt.rcParams["font.family"] = "IPAexGothic"
@@ -246,7 +247,9 @@ def setup_agent():
 
         execute_tool = PythonCodeExecutionTool(
             LocalCommandLineCodeExecutor(
-                timeout=300, work_dir="tmp", cleanup_temp_files=False
+                timeout=300,
+                work_dir="C:/agent-work",
+                cleanup_temp_files=False,
             ),
         )
 
@@ -267,11 +270,10 @@ def setup_agent():
 
 **グラフ生成とアップロードのルール:**
 1.  **思考**: まず、グラフを保存するファイル名を決めます。（例: `{yyyymmdd-hhmmss}.png`）
-2.  **行動 (コード実行)**: `execute_tool`を使い、
-3.  **観察**: コード実行が成功し、ファイルが作成されたことを確認します。
-4.  **行動 (アップロード)**: `upload_image_to_blob`ツールを呼び出し、`tmp/` を先頭に付けたパス（例: `tmp/{yyyymmdd-hhmmss}.png`）で画像をアップロードします。
-5.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
-6.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
+2.  **行動 (コード実行)**: `execute_tool`を使い、Pythonコードで `img` ディレクトリを作成し、そこにグラフを保存します（例: `import os; os.makedirs('img', exist_ok=True); plt.savefig('img/my_graph.png')`）。
+ `upload_image_to_blob`ツールを呼び出し、`C:/agent-work` を先頭に付けたパス（例: `C:/agent-work/img/{yyyymmdd-hhmmss}.png`）で画像をアップロードします。
+3.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
+4.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
 matplotlibで日本語グラフを作成する際は、日本語フォントの設定が必要です。以下のコードを実行して、日本語フォントを設定してください。
 '''
 plt.rcParams["font.family"] = "IPAexGothic"
@@ -292,7 +294,7 @@ def upload_image_to_blob(file_path: str) -> str:
     """
     指定されたローカルファイルパスの画像をAzure Blob Storageにアップロードし、その公開URLを返します。
     グラフをローカルに保存した後にこのツールを呼び出して、画像をクラウドにアップロードしてください。
-    例: upload_image_to_blob('tmp/img/my_graph.png')
+    例: upload_image_to_blob('C:/agent-work/my_graph.png')
     """
     if not os.path.exists(file_path):
         return f"エラー: ファイルが見つかりません {file_path}"
