@@ -148,9 +148,12 @@ def enhanced_chatbot_page():
                                 if content != "":
                                     role = getattr(msg, "source", "assistant")
                                     response_chunks.append(content)
-                                    st.session_state.chat_messages.append(
-                                        {"role": role, "content": content}
-                                    )
+                                    if (
+                                        role != "user"
+                                    ):  # userのメッセージは発話時に格納している
+                                        st.session_state.chat_messages.append(
+                                            {"role": role, "content": content}
+                                        )
 
                                     if role == "user":
                                         with st.chat_message("user"):
