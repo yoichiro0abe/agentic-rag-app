@@ -57,7 +57,7 @@ def create_execute_tool() -> PythonCodeExecutionTool:
     return PythonCodeExecutionTool(
         LocalCommandLineCodeExecutor(
             timeout=300,
-            work_dir="C:/agent-work",
+            work_dir="/agent-work",
             cleanup_temp_files=False,
         )
     )
