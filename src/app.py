@@ -3,6 +3,11 @@ import os
 import sys
 import logging
 
+from opentelemetry.trace import NoOpTracerProvider
+from autogen_core import SingleThreadedAgentRuntime
+
+runtime = SingleThreadedAgentRuntime(tracer_provider=NoOpTracerProvider())
+
 logging.basicConfig(
     level=logging.WARNING,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
