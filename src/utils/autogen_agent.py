@@ -5,19 +5,21 @@ from autogen_agentchat.teams import SelectorGroupChat
 from autogen_agentchat.conditions import TextMentionTermination, MaxMessageTermination
 from autogen_core.models import ModelInfo
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
-from autogen_ext.code_executors.local import LocalCommandLineCodeExecutor
-from autogen_ext.tools.code_execution import PythonCodeExecutionTool
 from dotenv import load_dotenv
 import logging
 import os
-from duckduckgo_search import DDGS
 import sys
 import asyncio
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 # ローカルモジュールのインポート
-from .tools import upload_file_to_blob
+from .tools import (
+    get_current_time,
+    upload_image_to_blob,
+    search_duckduckgo,
+    create_execute_tool,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -116,13 +118,7 @@ search_duckduckgoツールを使用して情報を検索します。
 必ず日本語で回答してください。""",
         )
 
-        execute_tool = PythonCodeExecutionTool(
-            LocalCommandLineCodeExecutor(
-                timeout=300,
-                work_dir="C:/agent-work",
-                cleanup_temp_files=False,
-            ),
-        )
+        execute_tool = create_execute_tool()
 
         data_analyst_agent = AssistantAgent(
             name="DataAnalystAgent",
@@ -151,8 +147,10 @@ matplotlibで日本語グラフを作成する際は、日本語フォントの�
 '''
 plt.rcParams["font.family"] = "IPAexGothic"
 '''
+**現在日時の取得:**
+現在の日付と時刻が必要な場合は、`get_current_time`ツールを使用してください。このツールは現在の日時を日本時間（JST）で「YYYY-MM-DD HH:MM:SS JST」形式で返します。
 必ず日本語で回答してください。""",
-            tools=[execute_tool, upload_image_to_blob],
+            tools=[execute_tool, upload_image_to_blob, get_current_time],
             reflect_on_tool_use=True,
         )
 
@@ -245,13 +243,7 @@ def setup_agent():
             model_info=model_info,
         )
 
-        execute_tool = PythonCodeExecutionTool(
-            LocalCommandLineCodeExecutor(
-                timeout=300,
-                work_dir="C:/agent-work",
-                cleanup_temp_files=False,
-            ),
-        )
+        execute_tool = create_execute_tool()
 
         data_analyst_agent = AssistantAgent(
             name="DataAnalystAgent",
@@ -278,8 +270,10 @@ matplotlibで日本語グラフを作成する際は、日本語フォントの�
 '''
 plt.rcParams["font.family"] = "IPAexGothic"
 '''
+**現在日時の取得:**
+現在の日付と時刻が必要な場合は、`get_current_time`ツールを使用してください。このツールは現在の日時を日本時間（JST）で「YYYY-MM-DD HH:MM:SS JST」形式で返します。
         必ず日本語で回答してください。""",
-            tools=[execute_tool, upload_image_to_blob],
+            tools=[execute_tool, upload_image_to_blob, get_current_time],
             reflect_on_tool_use=True,
         )
 
@@ -290,33 +284,27 @@ plt.rcParams["font.family"] = "IPAexGothic"
         return None
 
 
-def upload_image_to_blob(file_path: str) -> str:
-    """
-    指定されたローカルファイルパスの画像をAzure Blob Storageにアップロードし、その公開URLを返します。
-    グラフをローカルに保存した後にこのツールを呼び出して、画像をクラウドにアップロードしてください。
-    例: upload_image_to_blob('C:/agent-work/my_graph.png')
-    """
-    if not os.path.exists(file_path):
-        return f"エラー: ファイルが見つかりません {file_path}"
-
-    url = upload_file_to_blob(file_path)
-
-    # アップロード後にローカルファイルを削除
-    try:
-        os.remove(file_path)
-        logger.info(f"ローカルファイルを削除しました: {file_path}")
-    except Exception as e:
-        logger.warning(f"ローカルファイルの削除に失敗しました {file_path}: {e}")
-
-    return f"画像のアップロードに成功しました。URL: {url}"
-
-
-def search_duckduckgo(query: str) -> str:
-    """DuckDuckGo検索関数"""
-    try:
-        print(f"[llm_agent] DuckDuckGo検索ツールを使用: query='{query}'")
-        with DDGS() as ddgs:
-            results = ddgs.text(query)
-            return "\n".join([f"{r['title']}: {r['body']}" for r in results[:3]])
-    except Exception as e:
-        return f"検索エラー: {str(e)}"
+# カスタムツールクラスの例（必要に応じて使用）
+# from autogen_ext.tools import Tool
+#
+# class CustomSearchTool(Tool):
+#     """カスタム検索ツールの例"""
+#
+#     def __init__(self):
+#         super().__init__(
+#             name="custom_search",
+#             description="カスタマイズされた検索機能を提供するツール。DuckDuckGoを使用して高精度な検索を行います。",
+#             parameters={
+#                 "type": "object",
+#                 "properties": {
+#                     "query": {
+#                         "type": "string",
+#                         "description": "検索クエリ"
+#                     }
+#                 },
+#                 "required": ["query"]
+#             }
+#         )
+#
+#     def execute(self, query: str) -> str:
+#         return search_duckduckgo(query)
