@@ -21,6 +21,6 @@ pip list | grep opentelemetry
 # 再度確認
 echo "=== After Fix ==="
 pip show opentelemetry-semantic-conventions
-
+export AUTOGEN_DISABLE_RUNTIME_TRACING=true
 # Streamlitを本番モードで起動（CORS設定を明示的に指定）
 streamlit run src/app.py --server.port 8000 --server.fileWatcherType none --server.runOnSave false --server.headless true --server.enableCORS true --server.enableXsrfProtection true
