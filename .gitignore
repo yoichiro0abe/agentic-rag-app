@@ -8,7 +8,7 @@ tmp/
 #
 /log/*
 /data/*
-*.txt
+
 data.csv
 *.data
 static/
