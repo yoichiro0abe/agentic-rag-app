@@ -18,9 +18,6 @@ python --version
 echo "=== Environment Info ==="
 pip list | grep opentelemetry
 
-# ローカルと同じバージョンに固定
-pip install --force-reinstall opentelemetry-semantic-conventions==0.55b1
-
 # 再度確認
 echo "=== After Fix ==="
 pip show opentelemetry-semantic-conventions
