@@ -141,3 +141,7 @@ dmypy.json
 # Environment-specific requirements
 requirements-dev.txt
 requirements-prod.txt
+
+# OpenTelemetry cache
+.opentelemetry/
+opentelemetry/
