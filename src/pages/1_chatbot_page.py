@@ -41,6 +41,20 @@ def display_message_with_images(content: str):
                 st.markdown(part)
 
 
+def start_new_chat():
+    """新しい会話を開始する"""
+    # 現在のチャットを保存してから新しい会話を開始
+    if st.session_state.chat_messages:
+        save_current_chat()
+
+    # チャット状態をリセット
+    st.session_state.chat_messages = []
+    st.session_state.current_chat_id = None
+
+    # 画面を再読み込みして新しい会話状態を反映
+    st.rerun()
+
+
 def save_current_chat():
     """現在のチャットを保存"""
     if st.session_state.chat_messages:
@@ -72,7 +86,13 @@ def save_current_chat():
 
 def enhanced_chatbot_page():
     """拡張されたチャットボット画面"""
-    st.header("🤖 チャットボット")
+    # セッション状態の初期化を最初に実行
+    if "chat_messages" not in st.session_state:
+        st.session_state.chat_messages = []
+
+    # 現在のチャットIDの初期化
+    if "current_chat_id" not in st.session_state:
+        st.session_state.current_chat_id = None
 
     # エージェントの初期化
     if "agent" not in st.session_state:
@@ -85,17 +105,30 @@ def enhanced_chatbot_page():
         )
         st.session_state.data_manager = DataManager(DATA_DIR)
 
-    # チャットメッセージの初期化
-    if "chat_messages" not in st.session_state:
-        st.session_state.chat_messages = []
+    st.header("🤖 チャットボット")
 
-    # 現在のチャットIDの初期化
-    if "current_chat_id" not in st.session_state:
-        st.session_state.current_chat_id = None
+    # ヘッダー部分にボタンを配置
+    col1, col2, col3 = st.columns([2, 1, 1])
+    with col1:
+        # 現在のチャット状態を表示
+        if st.session_state.chat_messages:
+            message_count = len(st.session_state.chat_messages)
+            st.caption(f"💬 メッセージ数: {message_count}")
+        else:
+            st.caption("💭 新しい会話を開始してください")
+    with col3:
+        if st.button("🆕 新しい会話", key="header_new_chat", type="secondary"):
+            start_new_chat()
 
     # サイドバーの設定
     with st.sidebar:
         st.subheader("⚙️ チャット設定")
+
+        # 新しい会話ボタン
+        if st.button("🆕 新しい会話", use_container_width=True, type="primary"):
+            start_new_chat()
+
+        st.divider()
 
         # 応答モード選択（エージェントのみ）
         response_mode = st.selectbox(
@@ -113,6 +146,9 @@ def enhanced_chatbot_page():
         else:
             with st.chat_message("assistant"):
                 display_message_with_images(message["content"])
+
+    # チャット入力セクション
+    st.divider()
 
     # ユーザー入力
     if prompt := st.chat_input("メッセージを入力してください..."):

@@ -24,6 +24,8 @@ from .tools import (
     create_execute_tool,
     load_erp_data,
     load_material_cost_breakdown,
+    load_mes_total_data,
+    load_mes_loss_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -282,6 +284,8 @@ plt.rcParams["font.family"] = "IPAexGothic"
                 get_current_time,
                 load_erp_data,
                 load_material_cost_breakdown,
+                load_mes_total_data,
+                load_mes_loss_data,
             ],
             reflect_on_tool_use=True,
         )

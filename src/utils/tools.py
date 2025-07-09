@@ -220,3 +220,114 @@ def load_material_cost_breakdown(year_months: List[str], sku: str) -> str:
     except Exception as e:
         logger.error(f"材料費データの読み込みエラー: {str(e)}")
         return f"エラー: 材料費データの読み込みに失敗しました: {str(e)}"
+
+
+def load_mes_total_data(year_months: List[str] = None, skus: List[str] = None) -> str:
+    """
+    MES総合データ（良品数・不良数）を読み込み、指定された年月とSKUに基づいてCSVデータを返すツール。
+
+    Args:
+        year_months (List[str], optional): フィルタする年月のリスト（例: ["2024-06", "2024-07"]）
+        skus (List[str], optional): フィルタするSKUのリスト（例: ["SKU001", "SKU002"]）
+
+    Returns:
+        str: 指定された年月とSKUに基づいた良品数・不良数のCSVデータ
+
+    Examples:
+        load_mes_total_data(["2024-06"], ["SKU001", "SKU002"])
+        load_mes_total_data(year_months=["2024-06", "2024-07"])
+        load_mes_total_data(skus=["SKU001"])
+        load_mes_total_data()  # 全データを取得
+    """
+    try:
+        # MES総合データファイルのパスを設定
+        mes_total_file_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "sampledata",
+            "mes_total.csv",
+        )
+
+        if not os.path.exists(mes_total_file_path):
+            return (
+                f"エラー: MES総合データファイルが見つかりません: {mes_total_file_path}"
+            )
+
+        # CSVファイルを読み込み
+        df = pd.read_csv(mes_total_file_path, encoding="utf-8")
+
+        # 年月でフィルタ（年月日から年月を抽出してフィルタ）
+        if year_months:
+            df["年月"] = df["年月日"].str[:7]  # YYYY-MM-DD から YYYY-MM を抽出
+            df = df[df["年月"].isin(year_months)]
+            df = df.drop(columns=["年月"])  # 一時的に追加した年月カラムを削除
+
+        # SKUでフィルタ
+        if skus:
+            df = df[df["SKU"].isin(skus)]
+
+        if df.empty:
+            return f"指定された条件（年月: {year_months}, SKU: {skus}）に該当するデータがありません。"
+
+        # CSVの内容を文字列として返す
+        csv_content = df.to_csv(index=False, encoding="utf-8")
+
+        return csv_content
+
+    except Exception as e:
+        logger.error(f"MES総合データの読み込みエラー: {str(e)}")
+        return f"エラー: MES総合データの読み込みに失敗しました: {str(e)}"
+
+
+def load_mes_loss_data(year_months: List[str] = None, skus: List[str] = None) -> str:
+    """
+    MESロス内訳データ（加工機ロス、包装機ロス、検品ロス、フィルムロス、不明ロス）を読み込み、
+    指定された年月とSKUに基づいてCSVデータを返すツール。
+
+    Args:
+        year_months (List[str], optional): フィルタする年月のリスト（例: ["2024-06", "2024-07"]）
+        skus (List[str], optional): フィルタするSKUのリスト（例: ["SKU001", "SKU002"]）
+
+    Returns:
+        str: 指定された年月とSKUに基づいたロス内訳のCSVデータ
+
+    Examples:
+        load_mes_loss_data(["2024-06"], ["SKU001", "SKU002"])
+        load_mes_loss_data(year_months=["2024-06", "2024-07"])
+        load_mes_loss_data(skus=["SKU001"])
+        load_mes_loss_data()  # 全データを取得
+    """
+    try:
+        # MESロス内訳データファイルのパスを設定
+        mes_loss_file_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "sampledata",
+            "mes_total_err.csv",
+        )
+
+        if not os.path.exists(mes_loss_file_path):
+            return f"エラー: MESロス内訳データファイルが見つかりません: {mes_loss_file_path}"
+
+        # CSVファイルを読み込み
+        df = pd.read_csv(mes_loss_file_path, encoding="utf-8")
+
+        # 年月でフィルタ（年月日から年月を抽出してフィルタ）
+        if year_months:
+            df["年月"] = df["年月日"].str[:7]  # YYYY-MM-DD から YYYY-MM を抽出
+            df = df[df["年月"].isin(year_months)]
+            df = df.drop(columns=["年月"])  # 一時的に追加した年月カラムを削除
+
+        # SKUでフィルタ
+        if skus:
+            df = df[df["SKU"].isin(skus)]
+
+        if df.empty:
+            return f"指定された条件（年月: {year_months}, SKU: {skus}）に該当するデータがありません。"
+
+        # CSVの内容を文字列として返す
+        csv_content = df.to_csv(index=False, encoding="utf-8")
+
+        return csv_content
+
+    except Exception as e:
+        logger.error(f"MESロス内訳データの読み込みエラー: {str(e)}")
+        return f"エラー: MESロス内訳データの読み込みに失敗しました: {str(e)}"
