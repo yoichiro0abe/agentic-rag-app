@@ -10,9 +10,13 @@ import logging
 import os
 import sys
 import asyncio
+import platform
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    # Windows環境の場合のみdotenvファイルを読み込む
+    load_dotenv("./.env_o4mini", override=True)
+
 # ローカルモジュールのインポート
 from .tools import (
     get_current_time,
@@ -28,9 +32,6 @@ logger.setLevel(logging.INFO)
 def setup_multiagent_team():
     """マルチエージェントチームのセットアップ"""
     try:
-        # 環境変数の読み込み
-        load_dotenv("./.env_o4mini", override=True)
-
         # LLM設定（Azure OpenAI）
         model_info = ModelInfo(
             vision=False,
@@ -201,9 +202,6 @@ plt.rcParams["font.family"] = "IPAexGothic"
 def setup_agent():
     """エージェントのセットアップ"""
     try:
-        # 環境変数の読み込み
-        load_dotenv("./.env_gpt4.1", override=True)
-
         # LLM設定（Azure OpenAI）
         model_info = ModelInfo(
             vision=False,
