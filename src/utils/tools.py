@@ -6,6 +6,8 @@ from datetime import datetime, timezone, timedelta
 from duckduckgo_search import DDGS
 from autogen_ext.code_executors.local import LocalCommandLineCodeExecutor
 from autogen_ext.tools.code_execution import PythonCodeExecutionTool
+import pandas as pd
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -121,3 +123,50 @@ def upload_image_to_blob(file_path: str) -> str:
     except Exception as e:
         logger.error(f"Azure Blob Storageへのファイルアップロードに失敗しました: {e}")
         return f"エラー: ファイルのアップロードに失敗しました。 {e}"
+
+
+def load_erp_data(year_months: List[str] = None, skus: List[str] = None) -> str:
+    """
+    ERP CSVファイルを読み込み、指定された年月とSKUに基づいてCSVデータを返すツール。
+
+    Args:
+        year_months (List[str], optional): フィルタする年月のリスト（例: ["2023-01", "2023-02"]）
+        skus (List[str], optional): フィルタするSKUのリスト（例: ["SKU001", "SKU002"]）
+
+    Returns:
+        str: 指定された年月とSKUに基づいたCSVデータ
+
+    Examples:
+        load_erp_data(["2023-01"], ["SKU001", "SKU002"])
+        load_erp_data(year_months=["2023-01", "2023-02"])
+        load_erp_data(skus=["SKU001"])
+        load_erp_data()  # 全データを取得
+    """
+    try:
+        # ERPファイルのパスを設定
+        erp_file_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "sampledata",
+            "erp.csv",
+        )
+
+        if not os.path.exists(erp_file_path):
+            return f"エラー: ERPファイルが見つかりません: {erp_file_path}"
+
+        # CSVファイルを読み込み
+        df = pd.read_csv(erp_file_path, encoding="utf-8")
+        # 年月でフィルタ
+        if year_months:
+            df = df[df["年月"].isin(year_months)]
+
+        # SKUでフィルタ
+        if skus:
+            df = df[df["SKU"].isin(skus)]
+        # CSVの内容を文字列として返す
+        csv_content = df.to_csv(index=True, encoding="utf-8")
+
+        return csv_content
+
+    except Exception as e:
+        logger.error(f"ERPデータの読み込みエラー: {str(e)}")
+        return f"エラー: ERPデータの読み込みに失敗しました: {str(e)}"
