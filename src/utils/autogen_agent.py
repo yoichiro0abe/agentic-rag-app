@@ -23,6 +23,7 @@ from .tools import (
     search_duckduckgo,
     create_execute_tool,
     load_erp_data,
+    load_material_cost_breakdown,
 )
 
 logger = logging.getLogger(__name__)
@@ -271,10 +272,17 @@ plt.rcParams["font.family"] = "IPAexGothic"
 **現在日時の取得:**
 現在の日付と時刻が必要な場合は、`get_current_time`ツールを使用してください。このツールは現在の日時を日本時間（JST）で「YYYY-MM-DD HH:MM:SS JST」形式で返します。
 
-**ERPデータの取得:**
-ERPデータが必要な場合は、`load_erp_data`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してERPデータをフィルタリングし、DataFrameの情報を返します。
+**生産費用についてのデータの取得:**
+変動費、固定費が必要な場合は、`load_erp_data`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してERPデータをフィルタリングし、DataFrameの情報を返します。
+材料費の内訳が必要な場合は、`load_material_cost_breakdown`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してERPデータをフィルタリングし、DataFrameの情報を返します。
         必ず日本語で回答してください。""",
-            tools=[execute_tool, upload_image_to_blob, get_current_time, load_erp_data],
+            tools=[
+                execute_tool,
+                upload_image_to_blob,
+                get_current_time,
+                load_erp_data,
+                load_material_cost_breakdown,
+            ],
             reflect_on_tool_use=True,
         )
 

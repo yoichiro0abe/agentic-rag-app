@@ -127,7 +127,7 @@ def upload_image_to_blob(file_path: str) -> str:
 
 def load_erp_data(year_months: List[str] = None, skus: List[str] = None) -> str:
     """
-    ERP CSVファイルを読み込み、指定された年月とSKUに基づいてCSVデータを返すツール。
+    SKUの固定費と変動費を読み込み、指定された年月とSKUに基づいてCSVデータを返すツール。
 
     Args:
         year_months (List[str], optional): フィルタする年月のリスト（例: ["2023-01", "2023-02"]）
@@ -170,3 +170,53 @@ def load_erp_data(year_months: List[str] = None, skus: List[str] = None) -> str:
     except Exception as e:
         logger.error(f"ERPデータの読み込みエラー: {str(e)}")
         return f"エラー: ERPデータの読み込みに失敗しました: {str(e)}"
+
+
+def load_material_cost_breakdown(year_months: List[str], sku: str) -> str:
+    """
+    SKUの材料費の内訳データを読み込み、指定された年月とSKUに基づいて原料別の費用内訳を返すツール。
+
+    Args:
+        year_months (List[str]): フィルタする年月のリスト（例: ["2023-01", "2023-02"]）
+        sku (str): フィルタするSKU（例: "SKU001"）
+
+    Returns:
+        str: 指定された年月とSKUに基づいた材料費内訳のCSVデータ
+
+    Examples:
+        load_material_cost_breakdown(["2023-01", "2023-02"], "SKU001")
+        load_material_cost_breakdown(["2024-01"], "SKU001")
+    """
+    try:
+        # 材料費ファイルのパスを設定
+        material_file_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "sampledata",
+            "erp_material.csv",
+        )
+
+        if not os.path.exists(material_file_path):
+            return f"エラー: 材料費ファイルが見つかりません: {material_file_path}"
+
+        # CSVファイルを読み込み
+        df = pd.read_csv(material_file_path, encoding="utf-8")
+
+        # 年月でフィルタ
+        if year_months:
+            df = df[df["年月"].isin(year_months)]
+
+        # SKUでフィルタ
+        if sku:
+            df = df[df["SKU"] == sku]
+
+        if df.empty:
+            return f"指定された条件（年月: {year_months}, SKU: {sku}）に該当するデータがありません。"
+
+        # CSVの内容を文字列として返す
+        csv_content = df.to_csv(index=False, encoding="utf-8")
+
+        return csv_content
+
+    except Exception as e:
+        logger.error(f"材料費データの読み込みエラー: {str(e)}")
+        return f"エラー: 材料費データの読み込みに失敗しました: {str(e)}"
