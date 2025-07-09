@@ -14,7 +14,7 @@ import asyncio
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     # Windows環境の場合のみdotenvファイルを読み込む
-    load_dotenv("./.env_o4mini", override=True)
+    load_dotenv("./.env_gpt4.1", override=True)
 
 # ローカルモジュールのインポート
 from .tools import (
@@ -261,6 +261,8 @@ def setup_agent():
 5. 失敗した場合は原因を分析し、改善策を立てて再実行する
 6. 成功したら次のステップに進むか、完了を報告する
 
+次のステップに進む場合はユーザに次のステップに進んでよいか確認してください。
+
 **グラフ生成とアップロードのルール:**
 1.  **思考**: まず、グラフを保存するファイル名を決めます。（例: `{yyyymmdd-hhmmss}.png`）
 2.  **行動 (コード実行)**: `execute_tool`を使い、Pythonコードで `img` ディレクトリを作成し、そこにグラフを保存します（例: `import os; os.makedirs('img', exist_ok=True); plt.savefig('img/my_graph.png')`）。
@@ -277,7 +279,11 @@ plt.rcParams["font.family"] = "IPAexGothic"
 **生産費用についてのデータの取得:**
 変動費、固定費が必要な場合は、`load_erp_data`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してERPデータをフィルタリングし、DataFrameの情報を返します。
 材料費の内訳が必要な場合は、`load_material_cost_breakdown`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してERPデータをフィルタリングし、DataFrameの情報を返します。
-        必ず日本語で回答してください。""",
+**MESデータの取得:**
+MESの総生産データが必要な場合は、`load_mes_total_data`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してMESデータをフィルタリングし、DataFrameの情報を返します。
+MESのロスデータが必要な場合は、`load_mes_loss_data`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してMESデータをフィルタリングし、DataFrameの情報を返します。
+**注意点:**
+必ず日本語で回答してください。""",
             tools=[
                 execute_tool,
                 upload_image_to_blob,
