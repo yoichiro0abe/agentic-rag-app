@@ -101,6 +101,41 @@ def init_session_state():
         st.session_state.current_chat_id = None
 
 
+@st.cache_data
+def calculate_statistics_data(chat_history_file: str, prompts_file: str):
+    """統計情報を計算する関数（キャッシュ対象）"""
+    try:
+        # チャット履歴の統計
+        if os.path.exists(chat_history_file):
+            with open(chat_history_file, "r", encoding="utf-8") as f:
+                chat_history = json.load(f)
+        else:
+            chat_history = []
+
+        total_chats = len(chat_history)
+        total_messages = sum(len(chat.get("messages", [])) for chat in chat_history)
+
+        # プロンプト数
+        if os.path.exists(prompts_file):
+            with open(prompts_file, "r", encoding="utf-8") as f:
+                prompts = json.load(f)
+        else:
+            prompts = []
+
+        return {
+            "total_chats": total_chats,
+            "total_messages": total_messages,
+            "total_prompts": len(prompts),
+        }
+    except Exception as e:
+        return {
+            "total_chats": 0,
+            "total_messages": 0,
+            "total_prompts": 0,
+            "error": str(e),
+        }
+
+
 def display_statistics():
     """統計情報の表示"""
     data_manager = st.session_state.get("data_manager")
@@ -112,24 +147,19 @@ def display_statistics():
         st.markdown("---")
         st.subheader("📊 統計情報")
 
-        try:
-            # チャット履歴の統計
-            chat_history = data_manager.load_chat_history()
-            total_chats = len(chat_history)
-            total_messages = sum(len(chat.get("messages", [])) for chat in chat_history)
+        # キャッシュされた統計データを取得
+        stats = calculate_statistics_data(CHAT_HISTORY_FILE, PROMPTS_FILE)
 
+        if "error" in stats:
+            st.error(f"統計情報の取得に失敗: {stats['error']}")
+        else:
             col1, col2 = st.columns(2)
             with col1:
-                st.metric("チャット数", total_chats)
+                st.metric("チャット数", stats["total_chats"])
             with col2:
-                st.metric("メッセージ数", total_messages)
+                st.metric("メッセージ数", stats["total_messages"])
 
-            # プロンプト数
-            prompts = data_manager.load_prompts()
-            st.metric("プロンプト数", len(prompts))
-
-        except Exception as e:
-            st.error(f"統計情報の取得に失敗: {str(e)}")
+            st.metric("プロンプト数", stats["total_prompts"])
 
 
 def setup_authentication():
