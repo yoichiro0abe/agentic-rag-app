@@ -5,9 +5,9 @@ annotated-types==0.7.0
 anyio==4.9.0
 asyncio-atexit==1.0.1
 attrs==25.3.0
-autogen-agentchat==0.6.2
-autogen-core==0.6.2
-autogen-ext[azure,docker,openai]==0.6.2
+autogen-agentchat==0.6.4
+autogen-core==0.6.4
+autogen-ext==0.6.4
 azure-ai-agents==1.0.1
 azure-ai-inference==1.0.0b9
 azure-ai-projects==1.0.0b12
@@ -65,7 +65,6 @@ narwhals==1.44.0
 numpy==1.26.4
 openai==1.93.0
 opentelemetry-api==1.34.1
-opentelemetry-semantic-conventions==0.55b1
 ortools==9.12.4544
 packaging==25.0
 pandas==2.3.0
@@ -89,7 +88,7 @@ pytest==7.4.4
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 pytz==2025.2
-pywin32==310; sys_platform == "win32"
+pywin32==310
 PyYAML==6.0.2
 referencing==0.36.2
 regex==2024.11.6
