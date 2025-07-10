@@ -77,27 +77,22 @@ def main():
         # ログイン UI を表示し、戻り値を受け取ってセッションに保存
         login_result = authenticator.login("main")
 
-        # login() の戻り値がNoneでないことを確認
+        # 認証が成功した場合のみ処理
         if login_result is not None:
             name, authentication_status, username = login_result
-
-            # 認証が成功した場合
             if authentication_status:
                 st.session_state["name"] = name
                 st.session_state["authentication_status"] = authentication_status
                 st.session_state["username"] = username
                 st.rerun()
-            elif authentication_status is False:
-                st.error("🚫 ユーザー名またはパスワードが正しくありません")
-                st.info("💡 再度ログイン情報を入力してください")
-                # セッション状態をクリアしてログインページに戻る
-                if "authentication_status" in st.session_state:
-                    del st.session_state["authentication_status"]
-                if "name" in st.session_state:
-                    del st.session_state["name"]
-                if "username" in st.session_state:
-                    del st.session_state["username"]
-                st.rerun()
+
+        # 認証失敗または未入力の場合の処理
+        if st.session_state.get("authentication_status") is False:
+            st.error("🚫 ユーザー名またはパスワードが正しくありません")
+            st.info("💡 正しいユーザー名とパスワードを入力してください")
+        else:
+            # 初回表示時のメッセージ
+            st.info("📝 ログイン情報を入力してください")
     else:
         # サイドバーにログアウトボタンを追加
         with st.sidebar:

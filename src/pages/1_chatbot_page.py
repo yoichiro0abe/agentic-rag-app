@@ -18,6 +18,19 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 
+def display_custom_chat_message(role: str, content: str):
+    """カスタムアイコンでチャットメッセージを表示"""
+    # ユーザーの場合のみカスタム画像を使用、その他は元のままの表示
+    if role == "user":
+        # ユーザーのみ花王のマークを使用
+        with st.chat_message(role, avatar="demo_kao.jpeg"):
+            display_message_with_images(content)
+    else:
+        # その他（システム、アシスタントなど）は元のままの表示
+        with st.chat_message(role):
+            display_message_with_images(content)
+
+
 def display_message_with_images(content: str):
     """メッセージ内の画像パスを検出し、画像とテキストを表示する"""
     # [image: path/to/image.png] 形式のタグを検出
@@ -139,13 +152,10 @@ def enhanced_chatbot_page():
     # チャット履歴を表示
     for message in st.session_state.chat_messages:
         role = message.get("role", "assistant")
-        logger.info(f"Displaying message: {role} - {message['content']}")
-        if role == "user":
-            with st.chat_message("user"):
-                st.markdown(message["content"])
-        else:
-            with st.chat_message("assistant"):
-                display_message_with_images(message["content"])
+        content = message.get("content", "")
+        logger.info(f"Displaying message: {role} - {content}")
+
+        display_custom_chat_message(role, content)
 
     # チャット入力セクション
     st.divider()
@@ -192,11 +202,11 @@ def enhanced_chatbot_page():
                                         )
 
                                     if role == "user":
-                                        with st.chat_message("user"):
-                                            st.markdown(content)
+                                        display_custom_chat_message("user", content)
                                     else:
-                                        with st.chat_message("assistant"):
-                                            display_message_with_images(content)
+                                        display_custom_chat_message(
+                                            "assistant", content
+                                        )
 
                         # イベントループで実行
                         import asyncio as _asyncio
@@ -214,8 +224,7 @@ def enhanced_chatbot_page():
             st.session_state.chat_messages.append(
                 {"role": "assistant", "content": response}
             )
-            with st.chat_message("assistant"):
-                display_message_with_images(response)
+            display_custom_chat_message("assistant", response)
 
         # チャット履歴を保存
         save_current_chat()
