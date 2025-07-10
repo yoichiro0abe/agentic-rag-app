@@ -14,7 +14,7 @@ import asyncio
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     # Windows環境の場合のみdotenvファイルを読み込む
-    load_dotenv("./.env_gpt4.1", override=True)
+    load_dotenv("./.env_o4mini", override=True)
 
 # ローカルモジュールのインポート
 from .tools import (
