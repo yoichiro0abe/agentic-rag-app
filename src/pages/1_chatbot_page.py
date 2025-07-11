@@ -27,7 +27,7 @@ def display_custom_chat_message(role: str, content: str):
             display_message_with_images(content)
     else:
         # その他（システム、アシスタントなど）は元のままの表示
-        with st.chat_message(role):
+        with st.chat_message(role, avatar="avanade.png"):
             display_message_with_images(content)
 
 

@@ -12,6 +12,38 @@ from typing import List
 logger = logging.getLogger(__name__)
 
 
+def get_work_directory():
+    """OSに応じた作業ディレクトリパスを取得
+
+    Returns:
+        str: 作業ディレクトリのパス
+        - Azure App Service: '/home/site/work' (永続化される)
+        - ローカル開発: 'work' (相対パス)
+
+    Notes:
+        Azure App Serviceでは/home/siteディレクトリが永続化されるため、
+        そのサブディレクトリとしてworkディレクトリを作成します。
+    """
+    # Azure App Service環境の検出
+    # WEBSITE_SITE_NAME環境変数はAzure App Serviceでのみ設定される
+    if os.getenv("WEBSITE_SITE_NAME"):
+        # Azure App Service環境：/home/siteディレクトリ内に作業ディレクトリを作成
+        # /home/siteは永続化されるため安全
+        work_dir = "/home/site/work"
+        # ディレクトリが存在しない場合は作成
+        try:
+            os.makedirs(work_dir, exist_ok=True)
+        except OSError as e:
+            logger.warning(f"作業ディレクトリの作成に失敗: {e}")
+            # フォールバック: /tmpディレクトリを使用（一時的）
+            work_dir = "/tmp/work"
+            os.makedirs(work_dir, exist_ok=True)
+        return work_dir
+    else:
+        # ローカル環境：プロジェクトディレクトリ内の相対パス
+        return "work"
+
+
 def get_current_time() -> str:
     """
     現在の日時を日本時間（JST）で取得するツール。

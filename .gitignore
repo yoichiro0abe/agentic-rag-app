@@ -9,7 +9,7 @@ tmp/
 /log/*
 /data/*
 /work/*
-
+/agent-work/*
 data.csv
 *.data
 static/
