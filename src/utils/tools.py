@@ -102,7 +102,22 @@ def upload_image_to_blob(file_path: str) -> str:
     """
     # コード実行エージェントの作業ディレクトリを取得
     agent_work_dir = get_work_directory()
-    full_path_in_agent_work_dir = os.path.join(agent_work_dir, file_path)
+    # file_pathを正規化し、workディレクトリ重複を排除
+    normalized = os.path.normpath(file_path)
+    abs_work = os.path.abspath(agent_work_dir)
+    # 絶対パスでwork_dir配下を指す場合は相対パスに変換
+    if os.path.isabs(normalized) and normalized.startswith(abs_work + os.path.sep):
+        file_path = os.path.relpath(normalized, abs_work)
+    else:
+        # 相対パスで先頭にworkディレクトリ名がある場合は削除
+        parts = normalized.split(os.path.sep)
+        if parts and parts[0] == os.path.basename(agent_work_dir):
+            file_path = os.path.sep.join(parts[1:])
+        else:
+            file_path = normalized
+
+    # 絶対パスで扱うため、作業ディレクトリの絶対パスと結合
+    full_path_in_agent_work_dir = os.path.join(abs_work, file_path)
 
     # まずエージェントの作業ディレクトリ内を探索
     if os.path.exists(full_path_in_agent_work_dir):
