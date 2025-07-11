@@ -91,7 +91,7 @@ def create_execute_tool() -> PythonCodeExecutionTool:
     return PythonCodeExecutionTool(
         LocalCommandLineCodeExecutor(
             timeout=300,
-            work_dir="./agent-work",
+            work_dir=get_work_directory(),
             cleanup_temp_files=False,
         )
     )
@@ -114,8 +114,18 @@ def upload_image_to_blob(file_path: str) -> str:
         グラフをローカルに保存した後にこのツールを呼び出して、画像をクラウドにアップロードしてください。
         アップロード後、ローカルファイルは自動的に削除されます。
     """
-    if not os.path.exists(file_path):
-        return f"エラー: ファイルが見つかりません {file_path}"
+    # コード実行エージェントの作業ディレクトリを取得
+    agent_work_dir = get_work_directory()
+    full_path_in_agent_work_dir = os.path.join(agent_work_dir, file_path)
+
+    # まずエージェントの作業ディレクトリ内を探索
+    if os.path.exists(full_path_in_agent_work_dir):
+        path_to_use = full_path_in_agent_work_dir
+    # 次に渡されたパスをそのまま探索（後方互換性または絶対パス指定の場合）
+    elif os.path.exists(file_path):
+        path_to_use = file_path
+    else:
+        return f"エラー: ファイルが見つかりません。試行したパス: {full_path_in_agent_work_dir} および {file_path}"
 
     try:
         connect_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
@@ -129,15 +139,15 @@ def upload_image_to_blob(file_path: str) -> str:
         blob_service_client = BlobServiceClient.from_connection_string(connect_str)
 
         # 上書きを防ぐために一意のBLOB名を生成
-        blob_name = f"{uuid.uuid4()}-{os.path.basename(file_path)}"
+        blob_name = f"{uuid.uuid4()}-{os.path.basename(path_to_use)}"
         blob_client = blob_service_client.get_blob_client(
             container=container_name, blob=blob_name
         )
 
         logger.info(
-            f"Uploading {file_path} to Azure Blob Storage as blob {blob_name}..."
+            f"Uploading {path_to_use} to Azure Blob Storage as blob {blob_name}..."
         )
-        with open(file_path, "rb") as data:
+        with open(path_to_use, "rb") as data:
             blob_client.upload_blob(data, overwrite=True)
 
         logger.info("Upload successful.")
@@ -145,10 +155,10 @@ def upload_image_to_blob(file_path: str) -> str:
 
         # アップロード後にローカルファイルを削除
         try:
-            os.remove(file_path)
-            logger.info(f"ローカルファイルを削除しました: {file_path}")
+            os.remove(path_to_use)
+            logger.info(f"ローカルファイルを削除しました: {path_to_use}")
         except Exception as e:
-            logger.warning(f"ローカルファイルの削除に失敗しました {file_path}: {e}")
+            logger.warning(f"ローカルファイルの削除に失敗しました {path_to_use}: {e}")
 
         return f"画像のアップロードに成功しました。URL: {url}"
 

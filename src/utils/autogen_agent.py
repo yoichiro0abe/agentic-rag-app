@@ -127,6 +127,9 @@ search_duckduckgoツールを使用して情報を検索します。
 
         execute_tool = create_execute_tool()
 
+        # 作業ディレクトリを取得してプロンプトに埋め込む
+        work_dir = get_work_directory()
+
         data_analyst_agent = AssistantAgent(
             name="DataAnalystAgent",
             model_client=model_client,
@@ -145,15 +148,12 @@ search_duckduckgoツールを使用して情報を検索します。
 データが見えない場合は、必要なデータをユーザに求めます。
 **重要**: ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
 **グラフ生成とアップロードのルール:**
-1.  **思考**: まず、`get_work_directory` ツールを使って、コード実行の作業ディレクトリパスを取得します。
-2.  **行動 (ツール呼び出し)**: `get_work_directory()`
-3.  **観察**: 作業ディレクトリのパス（例: `/home/site/work` や `work`）を取得します。
-4.  **思考**: 取得した作業ディレクトリパスとファイル名を組み合わせて、グラフの保存先フルパスを決定します。
-5.  **行動 (コード実行)**: `execute_tool` を使い、決定したフルパスにグラフを保存するPythonコードを実行します。（例: `plt.savefig('/home/site/work/img/my_graph.png')`）
-6.  **思考**: コード実行後、`upload_image_to_blob` ツールを呼び出して、保存した画像をアップロードする計画を立てます。
-7.  **行動 (ツール呼び出し)**: `upload_image_to_blob` ツールを呼び出します。引数 `file_path` には、ステップ5で使ったフルパスをそのまま指定します。
-8.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
-9.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
+1.  **思考**: グラフの保存先フルパスを決定します。作業ディレクトリは `{work_dir}` です。このパスとファイル名を組み合わせてください。（例: `'{work_dir}/img/my_graph.png'`）
+2.  **行動 (コード実行)**: `execute_tool` を使い、決定したフルパスにグラフを保存するPythonコードを実行します。
+3.  **思考**: コード実行後、`upload_image_to_blob` ツールを呼び出して、保存した画像をアップロードする計画を立てます。
+4.  **行動 (ツール呼び出し)**: `upload_image_to_blob` ツールを呼び出します。引数 `file_path` には、ステップ1で決定したフルパスをそのまま指定します。
+5.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
+6.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
 matplotlibで日本語グラフを作成する際は、以下のコードを実行してください：
 ```python
 import matplotlib.pyplot as plt
@@ -175,12 +175,7 @@ plt.rcParams["axes.unicode_minus"] = False
 **現在日時の取得:**
 現在の日付と時刻が必要な場合は、`get_current_time`ツールを使用してください。このツールは現在の日時を日本時間（JST）で「YYYY-MM-DD HH:MM:SS JST」形式で返します。
 必ず日本語で回答してください。""",
-            tools=[
-                execute_tool,
-                upload_image_to_blob,
-                get_current_time,
-                get_work_directory,
-            ],
+            tools=[execute_tool, upload_image_to_blob, get_current_time],
             reflect_on_tool_use=True,
         )
 
@@ -272,6 +267,9 @@ def setup_agent():
 
         execute_tool = create_execute_tool()
 
+        # 作業ディレクトリを取得してプロンプトに埋め込む
+        work_dir = get_work_directory()
+
         data_analyst_agent = AssistantAgent(
             name="DataAnalystAgent",
             model_client=model_client,
@@ -290,15 +288,12 @@ def setup_agent():
 次のステップに進む場合はユーザに次のステップに進んでよいか確認してください。
 
 **グラフ生成とアップロードのルール:**
-1.  **思考**: まず、`get_work_directory` ツールを使って、コード実行の作業ディレクトリパスを取得します。
-2.  **行動 (ツール呼び出し)**: `get_work_directory()`
-3.  **観察**: 作業ディレクトリのパス（例: `/home/site/work` や `work`）を取得します。
-4.  **思考**: 取得した作業ディレクトリパスとファイル名を組み合わせて、グラフの保存先フルパスを決定します。
-5.  **行動 (コード実行)**: `execute_tool` を使い、決定したフルパスにグラフを保存するPythonコードを実行します。（例: `plt.savefig('/home/site/work/img/my_graph.png')`）
-6.  **思考**: コード実行後、`upload_image_to_blob` ツールを呼び出して、保存した画像をアップロードする計画を立てます。
-7.  **行動 (ツール呼び出し)**: `upload_image_to_blob` ツールを呼び出します。引数 `file_path` には、ステップ5で使ったフルパスをそのまま指定します。
-8.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
-9.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
+1.  **思考**: グラフの保存先フルパスを決定します。作業ディレクトリは `{work_dir}` です。このパスとファイル名を組み合わせてください。（例: `'{work_dir}/img/my_graph.png'`）
+2.  **行動 (コード実行)**: `execute_tool` を使い、決定したフルパスにグラフを保存するPythonコードを実行します。
+3.  **思考**: コード実行後、`upload_image_to_blob` ツールを呼び出して、保存した画像をアップロードする計画を立てます。
+4.  **行動 (ツール呼び出し)**: `upload_image_to_blob` ツールを呼び出します。引数 `file_path` には、ステップ1で決定したフルパスをそのまま指定します。
+5.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
+6.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
 matplotlibで日本語グラフを作成する際は、以下のコードを実行してください：
 ```python
 import matplotlib.pyplot as plt
@@ -333,7 +328,6 @@ MESのロスデータが必要な場合は、`load_mes_loss_data`ツールを使
                 execute_tool,
                 upload_image_to_blob,
                 get_current_time,
-                get_work_directory,
                 load_erp_data,
                 load_material_cost_breakdown,
                 load_mes_total_data,
