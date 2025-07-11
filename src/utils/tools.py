@@ -7,7 +7,7 @@ from duckduckgo_search import DDGS
 from autogen_ext.code_executors.local import LocalCommandLineCodeExecutor
 from autogen_ext.tools.code_execution import PythonCodeExecutionTool
 import pandas as pd
-from typing import List
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -359,3 +359,55 @@ def load_mes_loss_data(year_months: List[str] = None, skus: List[str] = None) ->
     except Exception as e:
         logger.error(f"MESロス内訳データの読み込みエラー: {str(e)}")
         return f"エラー: MESロス内訳データの読み込みに失敗しました: {str(e)}"
+
+
+def load_daily_report(month: str, keyword: Optional[str] = None) -> str:
+    """
+    日報データ（daily_report.csv）を読み込み、指定された月とキーワードで検索するツール。
+
+    Args:
+        month (str): フィルタする年月（例: "2024-07"）。
+        keyword (Optional[str], optional): 検索するキーワード。'内容'列から部分一致で検索します。指定しない場合はキーワードでの絞り込みは行いません。
+
+    Returns:
+        str: 検索結果のCSVデータ。
+
+    Examples:
+        load_daily_report(month="2024-07", keyword="トラブル")
+        load_daily_report(month="2024-06")
+    """
+    try:
+        # daily_report.csvのパスを設定
+        report_file_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            "sampledata",
+            "daily_report.csv",
+        )
+
+        if not os.path.exists(report_file_path):
+            return f"エラー: 日報ファイルが見つかりません: {report_file_path}"
+
+        # CSVファイルを読み込み
+        df = pd.read_csv(report_file_path, encoding="utf-8")
+
+        # '日付'列をdatetime型に変換し、年月でフィルタ
+        df["日付"] = pd.to_datetime(df["日付"])
+        df_filtered = df[df["日付"].dt.strftime("%Y-%m") == month]
+
+        # キーワードでフィルタ（'内容'列を想定）
+        if keyword and "内容" in df_filtered.columns:
+            df_filtered = df_filtered[
+                df_filtered["内容"].str.contains(keyword, na=False)
+            ]
+
+        if df_filtered.empty:
+            return f"指定された条件（年月: {month}, キーワード: {keyword}）に該当するデータがありません。"
+
+        # CSVの内容を文字列として返す
+        csv_content = df_filtered.to_csv(index=False, encoding="utf-8")
+
+        return csv_content
+
+    except Exception as e:
+        logger.error(f"日報データの読み込みエラー: {str(e)}")
+        return f"エラー: 日報データの読み込みに失敗しました: {str(e)}"

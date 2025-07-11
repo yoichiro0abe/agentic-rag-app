@@ -21,6 +21,7 @@ from .tools import (
     load_material_cost_breakdown,
     load_mes_total_data,
     load_mes_loss_data,
+    load_daily_report,
 )
 
 # OS別の設定
@@ -314,6 +315,8 @@ plt.rcParams["axes.unicode_minus"] = False
 **MESデータの取得:**
 MESの総生産データが必要な場合は、`load_mes_total_data`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してMESデータをフィルタリングし、DataFrameの情報を返します。
 MESのロスデータが必要な場合は、`load_mes_loss_data`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してMESデータをフィルタリングし、DataFrameの情報を返します。
+**日報データの取得:**
+日々の報告内容（トラブル、改善点など）を検索したい場合は、`load_daily_report`ツールを使用してください。このツールは年月（"YYYY-MM"形式）とオプションのキーワードを指定して、関連する日報データを取得します。
 **注意点:**
 必ず日本語で回答してください。""",
             tools=[
@@ -323,6 +326,7 @@ MESのロスデータが必要な場合は、`load_mes_loss_data`ツールを使
                 load_material_cost_breakdown,
                 load_mes_total_data,
                 load_mes_loss_data,
+                load_daily_report,
             ],
             reflect_on_tool_use=True,
         )
