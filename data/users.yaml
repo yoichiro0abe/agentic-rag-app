@@ -12,6 +12,18 @@ credentials:
       email: user@example.com
       name: ユーザー
       password: $2b$12$NeQ1XUDrBO1oxBWq2VHHpOwWFpJjgPhj5ph9t7DUWrJN2G8jwt9TC
+    hashimoto:
+      email: hashimoto@example.com
+      name: ユーザー
+      password: $2b$12$NeQ1XUDrBO1oxBWq2VHHpOwWFpJjgPhj5ph9t7DUWrJN2G8jwt9TC
+    wakabayashi:
+      email: wakabayashi@example.com
+      name: ユーザー
+      password: $2b$12$NeQ1XUDrBO1oxBWq2VHHpOwWFpJjgPhj5ph9t7DUWrJN2G8jwt9TC
+    nakamura:
+      email: nakamura@example.com
+      name: ユーザー
+      password: $2b$12$NeQ1XUDrBO1oxBWq2VHHpOwWFpJjgPhj5ph9t7DUWrJN2G8jwt9TC
 preauthorized:
   emails:
   - admin@example.com

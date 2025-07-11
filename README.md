@@ -175,3 +175,6 @@ agentic-rag-app/
 
 ## メモ
 Get-ChildItem -Path . -Recurse -Name "__pycache__" -Directory | ForEach-Object { Remove-Item -Path $_ -Recurse -Force -Verbose }
+
+App service更新するときgit push azure master
+でportalのデプロイセンターのログで確認できる
