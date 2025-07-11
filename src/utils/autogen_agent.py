@@ -13,7 +13,6 @@ import asyncio
 
 # ローカルモジュールのインポート
 from .tools import (
-    get_current_time,
     get_work_directory,
     upload_image_to_blob,
     search_duckduckgo,
@@ -171,11 +170,8 @@ for parent in current_dir.parents:
         break
 
 plt.rcParams["axes.unicode_minus"] = False
-```
-**現在日時の取得:**
-現在の日付と時刻が必要な場合は、`get_current_time`ツールを使用してください。このツールは現在の日時を日本時間（JST）で「YYYY-MM-DD HH:MM:SS JST」形式で返します。
 必ず日本語で回答してください。""",
-            tools=[execute_tool, upload_image_to_blob, get_current_time],
+            tools=[execute_tool, upload_image_to_blob],
             reflect_on_tool_use=True,
         )
 

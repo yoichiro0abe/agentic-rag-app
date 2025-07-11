@@ -4,6 +4,8 @@ import sys
 import re
 from utils.database import DataManager
 from utils.autogen_agent import setup_agent
+from datetime import datetime
+import pytz
 import logging
 
 
@@ -174,6 +176,15 @@ def enhanced_chatbot_page():
             if not agent:
                 response = "エージェントの初期化に失敗しました。"
             else:
+                # タイムゾーンを日本時間に設定
+                jst = pytz.timezone("Asia/Tokyo")
+                current_time_str = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
+
+                # ユーザーのプロンプトに現在時刻の情報を付与
+                enhanced_prompt = f"""現在の時刻は {current_time_str} です。この情報を元に、以下の質問に回答してください。
+
+質問: {prompt}
+"""
                 # 非同期ストリーミング応答を逐次表示
                 response_chunks = []
                 streaming = True  # ストリーミング応答を利用
@@ -181,7 +192,7 @@ def enhanced_chatbot_page():
                     try:
 
                         async def stream_response():
-                            async for msg in agent.run_stream(task=prompt):
+                            async for msg in agent.run_stream(task=enhanced_prompt):
                                 logger.info(f"Received message: {msg}")
                                 content = getattr(msg, "content", "")
                                 # contentがJSONシリアライズ不可能なオブジェクトの場合、文字列に変換

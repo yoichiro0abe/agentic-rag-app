@@ -44,20 +44,6 @@ def get_work_directory():
         return "work"
 
 
-def get_current_time() -> str:
-    """
-    現在の日時を日本時間（JST）で取得するツール。
-
-    Returns:
-        str: 現在の日時を「YYYY-MM-DD HH:MM:SS JST」形式で返します。
-
-    Examples:
-        get_current_time() -> "2025-07-08 14:30:45 JST"
-    """
-    jst = timezone(timedelta(hours=9))
-    return datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
-
-
 def search_duckduckgo(query: str) -> str:
     """
     DuckDuckGoを使用してウェブ検索を行うツール。

@@ -5,6 +5,7 @@ import asyncio
 import logging
 import re
 from datetime import datetime
+import pytz
 import threading
 import pickle
 
@@ -168,10 +169,20 @@ P2からP18の生産時間は、プロンプトに記載された時間（P2: 10
             "status": "実行中",
             "error": None,  # エラー状態もリセット
         }
-        st.session_state.current_task = task_input  # タスクを保存
+
+        # タイムゾーンを日本時間に設定
+        jst = pytz.timezone("Asia/Tokyo")
+        current_time_str = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
+
+        # ユーザーのプロンプトに現在時刻の情報を付与
+        enhanced_task_input = f"""現在の時刻は {current_time_str} です。この情報を元に、以下のタスクを実行してください。
+
+タスク: {task_input}
+"""
+        st.session_state.current_task = enhanced_task_input  # タスクを保存
 
         # リアルタイム分析を開始（rerunの前に実行）
-        run_realtime_multiagent_analysis(task_input, max_turns, max_messages)
+        run_realtime_multiagent_analysis(enhanced_task_input, max_turns, max_messages)
 
         # 古いメッセージを表示しないようにページをリロード
         st.rerun()
