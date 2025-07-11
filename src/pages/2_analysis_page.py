@@ -179,10 +179,12 @@ P2からP18の生産時間は、プロンプトに記載された時間（P2: 10
 
 タスク: {task_input}
 """
-        st.session_state.current_task = enhanced_task_input  # タスクを保存
+        st.session_state.current_task = task_input  # 元のタスクを保存
 
         # リアルタイム分析を開始（rerunの前に実行）
-        run_realtime_multiagent_analysis(enhanced_task_input, max_turns, max_messages)
+        run_realtime_multiagent_analysis(
+            task_input, enhanced_task_input, max_turns, max_messages
+        )
 
         # 古いメッセージを表示しないようにページをリロード
         st.rerun()
@@ -317,7 +319,9 @@ def display_analysis_summary():
         st.metric("ステータス", status)
 
 
-def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
+def run_realtime_multiagent_analysis(
+    original_task: str, enhanced_task: str, max_turns: int, max_messages: int
+):
     """リアルタイムマルチエージェント分析の実行"""
     try:
         # tmpディレクトリの確保
@@ -349,7 +353,7 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
         ) | MaxMessageTermination(max_messages=max_messages)
 
         # シンプルなバックグラウンド実行
-        def execute_chat_simple():
+        def execute_chat_simple(original_task: str, enhanced_task: str):
             """チャット実行スレッド（シンプル版）"""
             try:
                 # 新しいイベントループを作成
@@ -359,8 +363,15 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
                 async def run_chat():
                     message_count = 0
                     messages_buffer = []
+                    is_first_message = True
                     try:
-                        async for message in chat.run_stream(task=task_input):
+                        async for message in chat.run_stream(task=enhanced_task):
+                            if is_first_message and hasattr(message, "content"):
+                                # 最初のメッセージ（通常はユーザーのタスク）のcontentを
+                                # 日時情報を含まない元のタスクに置き換える
+                                message.content = original_task
+                                is_first_message = False
+
                             # セッション状態の安全な確認
                             if hasattr(
                                 st.session_state, "current_analysis"
@@ -409,7 +420,9 @@ def run_realtime_multiagent_analysis(task_input, max_turns, max_messages):
                     f.write(str(e))
 
         # バックグラウンドでチャット実行開始
-        chat_thread = threading.Thread(target=execute_chat_simple)
+        chat_thread = threading.Thread(
+            target=execute_chat_simple, args=(original_task, enhanced_task)
+        )
         chat_thread.daemon = True
         chat_thread.start()
 
