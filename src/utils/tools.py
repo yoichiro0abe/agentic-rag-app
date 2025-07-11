@@ -390,9 +390,12 @@ def load_daily_report(month: str, keyword: Optional[str] = None) -> str:
         # CSVファイルを読み込み
         df = pd.read_csv(report_file_path, encoding="utf-8")
 
-        # '日付'列をdatetime型に変換し、年月でフィルタ
-        df["日付"] = pd.to_datetime(df["日付"])
-        df_filtered = df[df["日付"].dt.strftime("%Y-%m") == month]
+        # '年月日'列をdatetime型に変換し、年月でフィルタ
+        df["年月日"] = pd.to_datetime(df["年月日"])
+        df_filtered = df[df["年月日"].dt.strftime("%Y-%m") == month]
+        logger.info(
+            f"フィルタリング後のデータ行数: {len(df_filtered)} (月: {month}, キーワード: {keyword})"
+        )
 
         # キーワードでフィルタ（'内容'列を想定）
         if keyword and "内容" in df_filtered.columns:
@@ -409,5 +412,8 @@ def load_daily_report(month: str, keyword: Optional[str] = None) -> str:
         return csv_content
 
     except Exception as e:
+        import traceback
+
         logger.error(f"日報データの読み込みエラー: {str(e)}")
+        logger.error(f"エラーの詳細: {traceback.format_exc()}")
         return f"エラー: 日報データの読み込みに失敗しました: {str(e)}"

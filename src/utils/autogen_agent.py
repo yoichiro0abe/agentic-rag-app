@@ -7,6 +7,8 @@ from autogen_core.models import ModelInfo
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
 from dotenv import load_dotenv
 import logging
+import functools
+import time
 import os
 import sys
 import asyncio
@@ -148,10 +150,10 @@ search_duckduckgoツールを使用して情報を検索します。
 データが見えない場合は、必要なデータをユーザに求めます。
 **重要**: ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
 **グラフ生成とアップロードのルール:**
-1.  **思考**: グラフの保存先フルパスを決定します。作業ディレクトリは `{work_dir}` です。このパスとファイル名を組み合わせてください。（例: `'{work_dir}/img/my_graph.png'`）
-2.  **行動 (コード実行)**: `execute_tool` を使い、決定したフルパスにグラフを保存するPythonコードを実行します。
+1.  **思考**: グラフの保存先パスを決定します。作業ディレクトリは `{work_dir}` です。Pythonコード内でファイルを保存する際は、この作業ディレクトリからの相対パスを指定してください。（例: `'img/my_graph.png'`）。コード内で `{work_dir}` を含める必要はありません。
+2.  **行動 (コード実行)**: `execute_tool` を使い、決定した相対パスにグラフを保存するPythonコードを実行します。
 3.  **思考**: コード実行後、`upload_image_to_blob` ツールを呼び出して、保存した画像をアップロードする計画を立てます。
-4.  **行動 (ツール呼び出し)**: `upload_image_to_blob` ツールを呼び出します。引数 `file_path` には、ステップ1で決定したフルパスをそのまま指定します。
+4.  **行動 (ツール呼び出し)**: `upload_image_to_blob` ツールを呼び出します。引数 `file_path` には、ステップ2でコード内で使用した相対パスをそのまま指定します。
 5.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
 6.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
 matplotlibで日本語グラフを作成する際は、以下のコードを実行してください：
@@ -220,6 +222,25 @@ plt.rcParams["axes.unicode_minus"] = False
         return None
 
 
+def timer(func):
+    """実行時間を計測するデコレータ"""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        logger.info(f"{func.__name__} - 開始")
+        try:
+            result = func(*args, **kwargs)
+            return result
+        finally:
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            logger.info(f"{func.__name__} - 完了 (実行時間: {elapsed_time:.2f}秒)")
+
+    return wrapper
+
+
+@timer
 def setup_agent():
     """エージェントのセットアップ"""
     try:
@@ -271,7 +292,7 @@ def setup_agent():
             name="DataAnalystAgent",
             model_client=model_client,
             description="マルチステップで思考・行動するアナリストAI",
-            system_message="""あなたはマルチステップで思考・行動するアナリストAIです。
+            system_message=f"""あなたはマルチステップで思考・行動するアナリストAIです。
 ユーザーの目標を達成するために、以下のループを繰り返してください：
 
 1. 状況を把握し、目標と制約を明確にする
@@ -282,16 +303,17 @@ def setup_agent():
 5. 失敗した場合は原因を分析し、改善策を立てて再実行する
 6. 成功したら次のステップに進むか、完了を報告する
 
-次のステップに進む場合はユーザに次のステップに進んでよいか確認してください。
+次のステップに進む場合はユーザに「次のステップに進んでよいでしょうか？」と確認してください。
 
 **グラフ生成とアップロードのルール:**
-1.  **思考**: グラフの保存先フルパスを決定します。作業ディレクトリは `{work_dir}` です。このパスとファイル名を組み合わせてください。（例: `'{work_dir}/img/my_graph.png'`）
-2.  **行動 (コード実行)**: `execute_tool` を使い、決定したフルパスにグラフを保存するPythonコードを実行します。
+1.  **思考**: グラフの保存先パスを決定します。作業ディレクトリは `{work_dir}` です。Pythonコード内でファイルを保存する際は、この作業ディレクトリからの相対パスを指定してください。（例: `'img/my_graph.png'`）。コード内で `{work_dir}` を含める必要はありません。
+2.  **行動 (コード実行)**: `execute_tool` を使い、決定した相対パスにグラフを保存するPythonコードを実行します。
 3.  **思考**: コード実行後、`upload_image_to_blob` ツールを呼び出して、保存した画像をアップロードする計画を立てます。
-4.  **行動 (ツール呼び出し)**: `upload_image_to_blob` ツールを呼び出します。引数 `file_path` には、ステップ1で決定したフルパスをそのまま指定します。
+4.  **行動 (ツール呼び出し)**: `upload_image_to_blob` ツールを呼び出します。引数 `file_path` には、ステップ2でコード内で使用した相対パスをそのまま指定します。
 5.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
 6.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
-matplotlibで日本語グラフを作成する際は、以下のコードを実行してください：
+
+matplotlibでグラフを作成する際は、以下のコードを実行してください：
 ```python
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm

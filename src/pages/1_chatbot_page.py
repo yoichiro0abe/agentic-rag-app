@@ -181,10 +181,9 @@ def enhanced_chatbot_page():
                 current_time_str = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
 
                 # ユーザーのプロンプトに現在時刻の情報を付与
-                enhanced_prompt = f"""現在の時刻は {current_time_str} です。この情報を元に、以下の質問に回答してください。
+                enhanced_prompt = f"""{prompt}
 
-質問: {prompt}
-"""
+######現在の時刻: {current_time_str}######"""
                 # 非同期ストリーミング応答を逐次表示
                 response_chunks = []
                 streaming = True  # ストリーミング応答を利用
