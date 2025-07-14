@@ -8,6 +8,7 @@ from autogen_ext.code_executors.local import LocalCommandLineCodeExecutor
 from autogen_ext.tools.code_execution import PythonCodeExecutionTool
 import pandas as pd
 from typing import List, Optional
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -432,3 +433,34 @@ def load_daily_report(month: str, keyword: Optional[str] = None) -> str:
         logger.error(f"日報データの読み込みエラー: {str(e)}")
         logger.error(f"エラーの詳細: {traceback.format_exc()}")
         return f"エラー: 日報データの読み込みに失敗しました: {str(e)}"
+
+
+def check_content(input_str: str) -> str:
+    """
+    入力文字列がFunction***かどうか判定する
+
+    Args:
+        input_str (str): チェックする文字列
+
+    Returns:
+        str: 入力がFunction***の場合はパースしてname属性を取り出す
+    """
+    # パターン1: FunctionExecutionResult（contentベース） - リスト形式
+    content_pattern = r"FunctionExecutionResult\(content='[^']*', name='([^']*)', call_id='[^']*', is_error=[^)]*\)"
+    content_matches = re.findall(content_pattern, input_str)
+
+    if content_matches:
+        name_value = content_matches[0]
+        logger.info(f"name (content形式): {name_value}")
+        return name_value
+
+    # 正規表現パターン：型名、arguments、name を抽出
+    content_pattern = r"FunctionExecutionResult\(content='[^']*', name='([^']*)', call_id='[^']*', is_error=[^)]*\)"
+    content_matches = re.findall(content_pattern, input_str)
+
+    # 結果をリストに格納
+    for match in content_matches:
+        obj_type, arguments_json, name_value = match
+        logger.info(f"name: {name_value}")
+        return name_value
+    return None

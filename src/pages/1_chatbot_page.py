@@ -7,7 +7,7 @@ from utils.autogen_agent import setup_agent
 from datetime import datetime
 import pytz
 import logging
-
+from utils.tools import check_content
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -28,9 +28,14 @@ def display_custom_chat_message(role: str, content: str):
         with st.chat_message(role, avatar="demo_kao.jpeg"):
             display_message_with_images(content)
     else:
-        # その他（システム、アシスタントなど）は元のままの表示
-        with st.chat_message(role, avatar="avanade.png"):
-            display_message_with_images(content)
+        type_of_content = check_content(content)
+        logger.info(f"Content type: {type_of_content}")
+        if type_of_content:
+            with st.expander("📋 Agent呼び出しの詳細", expanded=False):
+                st.write(content)
+        else:
+            with st.chat_message(role, avatar="avanade.png"):
+                display_message_with_images(content)
 
 
 def display_message_with_images(content: str):
@@ -50,7 +55,7 @@ def display_message_with_images(content: str):
             elif os.path.exists(image_path):
                 st.image(image_path)
             else:
-                st.warning(f"画像ファイルまたはURLが見つかりません: {image_path}")
+                st.markdown(part)
         else:  # 偶数番目の要素がテキスト
             if part.strip():
                 st.markdown(part)
