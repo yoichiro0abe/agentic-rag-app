@@ -16,6 +16,7 @@ if current_dir not in sys.path:
 from utils.database import DataManager
 from utils.chatbot_helper import ChatBotHelper
 from utils.styles import get_custom_css
+from utils.tools import timer
 
 # データディレクトリのパス
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
@@ -184,6 +185,7 @@ def setup_authentication():
     return authenticator
 
 
+@timer
 def initialize_managers():
     """データマネージャーとチャットボットヘルパーの初期化"""
     if "data_manager" not in st.session_state:
@@ -192,6 +194,7 @@ def initialize_managers():
         st.session_state.chatbot_helper = ChatBotHelper()
 
 
+@timer
 def apply_custom_styles():
     """カスタムCSSの適用"""
     st.markdown(get_custom_css(), unsafe_allow_html=True)

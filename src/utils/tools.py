@@ -9,8 +9,29 @@ from autogen_ext.tools.code_execution import PythonCodeExecutionTool
 import pandas as pd
 from typing import List, Optional
 import re
+import functools
+import time
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
+def timer(func):
+    """実行時間を計測するデコレータ"""
+
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        logger.info(f"{func.__name__} - 開始")
+        try:
+            result = func(*args, **kwargs)
+            return result
+        finally:
+            end_time = time.time()
+            elapsed_time = end_time - start_time
+            logger.info(f"{func.__name__} - 完了 (実行時間: {elapsed_time:.2f}秒)")
+
+    return wrapper
 
 
 def get_work_directory():

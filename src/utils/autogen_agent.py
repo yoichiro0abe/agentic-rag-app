@@ -7,8 +7,6 @@ from autogen_core.models import ModelInfo
 from autogen_ext.models.openai import AzureOpenAIChatCompletionClient
 from dotenv import load_dotenv
 import logging
-import functools
-import time
 import os
 import sys
 import asyncio
@@ -24,6 +22,7 @@ from .tools import (
     load_mes_total_data,
     load_mes_loss_data,
     load_daily_report,
+    timer,
 )
 
 # OS別の設定
@@ -222,24 +221,6 @@ plt.rcParams["axes.unicode_minus"] = False
         return None
 
 
-def timer(func):
-    """実行時間を計測するデコレータ"""
-
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        start_time = time.time()
-        logger.info(f"{func.__name__} - 開始")
-        try:
-            result = func(*args, **kwargs)
-            return result
-        finally:
-            end_time = time.time()
-            elapsed_time = end_time - start_time
-            logger.info(f"{func.__name__} - 完了 (実行時間: {elapsed_time:.2f}秒)")
-
-    return wrapper
-
-
 @timer
 def setup_agent():
     """エージェントのセットアップ"""
@@ -358,29 +339,3 @@ MESのロスデータが必要な場合は、`load_mes_loss_data`ツールを使
     except Exception as e:
         logger.error(f"エージェントのセットアップ中にエラー: {str(e)}")
         return None
-
-
-# カスタムツールクラスの例（必要に応じて使用）
-# from autogen_ext.tools import Tool
-#
-# class CustomSearchTool(Tool):
-#     """カスタム検索ツールの例"""
-#
-#     def __init__(self):
-#         super().__init__(
-#             name="custom_search",
-#             description="カスタマイズされた検索機能を提供するツール。DuckDuckGoを使用して高精度な検索を行います。",
-#             parameters={
-#                 "type": "object",
-#                 "properties": {
-#                     "query": {
-#                         "type": "string",
-#                         "description": "検索クエリ"
-#                     }
-#                 },
-#                 "required": ["query"]
-#             }
-#         )
-#
-#     def execute(self, query: str) -> str:
-#         return search_duckduckgo(query)

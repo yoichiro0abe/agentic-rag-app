@@ -2,6 +2,9 @@ import streamlit as st
 import os
 import sys
 import logging
+from pathlib import Path
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
 
 from opentelemetry.trace import NoOpTracerProvider
 from autogen_core import SingleThreadedAgentRuntime
@@ -47,6 +50,20 @@ def main():
 
     # 認証の設定
     authenticator = setup_authentication()
+
+    # フォント設定をラムダ式で実行
+    # cacheにしたい
+    @st.cache_resource
+    def setup_font():
+        current_dir = Path(__file__).resolve()
+        for parent in current_dir.parents:
+            font_path = parent / "assets" / "fonts" / "ipaexg.ttf"
+            if font_path.exists():
+                fm.fontManager.addfont(str(font_path))
+                font_prop = fm.FontProperties(fname=str(font_path))
+                logger.info(f"Using font: {font_prop.get_name()}")
+
+    setup_font()
 
     # 認証状態の確認
     auth_status = st.session_state.get("authentication_status", False)

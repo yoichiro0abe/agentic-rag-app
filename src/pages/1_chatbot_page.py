@@ -4,6 +4,7 @@ import sys
 import re
 from utils.database import DataManager
 from utils.autogen_agent import setup_agent
+from utils.tools import timer
 from datetime import datetime
 import pytz
 import logging
@@ -20,6 +21,7 @@ if parent_dir not in sys.path:
     sys.path.insert(0, parent_dir)
 
 
+@timer
 def display_custom_chat_message(role: str, content: str):
     """カスタムアイコンでチャットメッセージを表示"""
     # ユーザーの場合のみカスタム画像を使用、その他は元のままの表示
@@ -38,6 +40,7 @@ def display_custom_chat_message(role: str, content: str):
                 display_message_with_images(content)
 
 
+@timer
 def display_message_with_images(content: str):
     """メッセージ内の画像パスを検出し、画像とテキストを表示する"""
     # [image: path/to/image.png] 形式のタグを検出
@@ -61,6 +64,7 @@ def display_message_with_images(content: str):
                 st.markdown(part)
 
 
+@timer
 def start_new_chat():
     """新しい会話を開始する"""
     # 現在のチャットを保存してから新しい会話を開始
@@ -75,6 +79,7 @@ def start_new_chat():
     st.rerun()
 
 
+@timer
 def save_current_chat():
     """現在のチャットを保存"""
     if st.session_state.chat_messages:
@@ -104,6 +109,7 @@ def save_current_chat():
             st.session_state.current_chat_id = chat_data.get("id")
 
 
+@timer
 def enhanced_chatbot_page():
     """拡張されたチャットボット画面"""
     # セッション状態の初期化を最初に実行
