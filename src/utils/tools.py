@@ -454,14 +454,12 @@ def check_content(input_str: str) -> str:
             name_value = content_matches[0]
             logger.info(f"name (content形式): {name_value}")
             return name_value
-
-        # 正規表現パターン：型名、arguments、name を抽出
-        function_call_pattern = r"FunctionCall\([^)]*name='([^']*)'[^)]*\)"
+        # 正規表現パターン：name を抽出
+        function_call_pattern = r"FunctionCall\(.*?name='([^']*)'.*?\)"
         function_call_matches = re.findall(function_call_pattern, input_str)
 
         # 結果をリストに格納
-        for match in function_call_matches:
-            obj_type, arguments_json, name_value = match
+        for name_value in function_call_matches:
             logger.info(f"name: {name_value}")
             return name_value
     except Exception as e:
