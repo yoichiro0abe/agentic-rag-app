@@ -445,22 +445,26 @@ def check_content(input_str: str) -> str:
     Returns:
         str: 入力がFunction***の場合はパースしてname属性を取り出す
     """
-    # パターン1: FunctionExecutionResult（contentベース） - リスト形式
-    content_pattern = r"FunctionExecutionResult\(content='[^']*', name='([^']*)', call_id='[^']*', is_error=[^)]*\)"
-    content_matches = re.findall(content_pattern, input_str)
+    try:
+        # パターン1: FunctionExecutionResult（contentベース） - リスト形式
+        content_pattern = r"FunctionExecutionResult\(content='[^']*', name='([^']*)', call_id='[^']*', is_error=[^)]*\)"
+        content_matches = re.findall(content_pattern, input_str)
 
-    if content_matches:
-        name_value = content_matches[0]
-        logger.info(f"name (content形式): {name_value}")
-        return name_value
+        if content_matches:
+            name_value = content_matches[0]
+            logger.info(f"name (content形式): {name_value}")
+            return name_value
 
-    # 正規表現パターン：型名、arguments、name を抽出
-    content_pattern = r"FunctionExecutionResult\(content='[^']*', name='([^']*)', call_id='[^']*', is_error=[^)]*\)"
-    content_matches = re.findall(content_pattern, input_str)
+        # 正規表現パターン：型名、arguments、name を抽出
+        function_call_pattern = r"FunctionCall\([^)]*name='([^']*)'[^)]*\)"
+        function_call_matches = re.findall(function_call_pattern, input_str)
 
-    # 結果をリストに格納
-    for match in content_matches:
-        obj_type, arguments_json, name_value = match
-        logger.info(f"name: {name_value}")
-        return name_value
+        # 結果をリストに格納
+        for match in function_call_matches:
+            obj_type, arguments_json, name_value = match
+            logger.info(f"name: {name_value}")
+            return name_value
+    except Exception as e:
+        logger.error(f"check_contentのエラー: {str(e)}")
+        return None
     return None
