@@ -53,7 +53,7 @@ def main():
 
     # フォント設定をラムダ式で実行
     # cacheにしたい
-    @st.cache_resource
+
     def setup_font():
         current_dir = Path(__file__).resolve()
         for parent in current_dir.parents:
