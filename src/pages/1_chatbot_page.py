@@ -2,6 +2,8 @@ import streamlit as st
 import os
 import sys
 import re
+import uuid
+import asyncio as _asyncio
 from utils.database import DataManager
 from utils.autogen_agent import setup_agent
 from utils.tools import timer
@@ -75,6 +77,13 @@ def start_new_chat():
     st.session_state.chat_messages = []
     st.session_state.current_chat_id = None
 
+    # エージェントを完全にリセット
+    reset_success = reset_agent_state()
+
+    if not reset_success:
+        st.error("エージェントのリセットに失敗しました。")
+        return
+
     # 画面を再読み込みして新しい会話状態を反映
     st.rerun()
 
@@ -120,9 +129,18 @@ def enhanced_chatbot_page():
     if "current_chat_id" not in st.session_state:
         st.session_state.current_chat_id = None
 
-    # エージェントの初期化
+    # エージェントの初期化（セッション固有）
     if "agent" not in st.session_state:
+        # セッション固有のエージェント識別子を生成
+        import uuid
+
+        if "session_id" not in st.session_state:
+            st.session_state.session_id = str(uuid.uuid4())
+
         st.session_state.agent = setup_agent()
+        logger.info(
+            f"新しいエージェントを初期化しました。セッションID: {st.session_state.session_id}"
+        )
 
     # データマネージャーとチャットボットヘルパーの初期化
     if "data_manager" not in st.session_state:
@@ -185,11 +203,16 @@ def enhanced_chatbot_page():
         if response_mode == "エージェントモード":
             agent = st.session_state.get("agent")
             if not agent:
+                logger.error("エージェントが初期化されていません。")
                 response = "エージェントの初期化に失敗しました。"
             else:
+                logger.info(
+                    f"エージェントを使用して応答生成開始。セッションID: {st.session_state.get('session_id', 'unknown')}"
+                )
                 # タイムゾーンを日本時間に設定
-                jst = pytz.timezone("Asia/Tokyo")
-                current_time_str = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
+                # jst = pytz.timezone("Asia/Tokyo")
+                # current_time_str = datetime.now(jst).strftime("%Y-%m-%d %H:%M:%S JST")
+                current_time_str = "2025-06-20 12:00:00 JST"  # デバッグ用の固定時間
 
                 # ユーザーのプロンプトに現在時刻の情報を付与
                 enhanced_prompt = f"""{prompt}
@@ -230,8 +253,6 @@ def enhanced_chatbot_page():
                                         )
 
                         # イベントループで実行
-                        import asyncio as _asyncio
-
                         _asyncio.run(stream_response())
                         response = "".join(response_chunks)
                     except Exception as e:
@@ -251,6 +272,32 @@ def enhanced_chatbot_page():
         save_current_chat()
 
 
+@timer
+def reset_agent_state():
+    """エージェントの状態を完全にリセット"""
+    try:
+        if "agent" in st.session_state:
+            old_session_id = st.session_state.get("session_id", "unknown")
+            logger.info(f"古いエージェント削除中。セッションID: {old_session_id}")
+            del st.session_state.agent
+
+        # 新しいセッションIDを生成
+        st.session_state.session_id = str(uuid.uuid4())
+
+        # 新しいエージェントを作成
+        st.session_state.agent = setup_agent()
+        logger.info(
+            f"新しいエージェントを作成しました。セッションID: {st.session_state.session_id}"
+        )
+
+        return True
+    except Exception as e:
+        logger.error(f"エージェントリセット中にエラー: {e}")
+        return False
+
+
 # このページが直接実行された場合
 if __name__ == "__main__":
     enhanced_chatbot_page()
+
+# use context7
