@@ -199,7 +199,7 @@ file_path = "img/graph_name.png"
 plt.savefig(file_path, dpi=300, bbox_inches='tight')
 plt.close()
 url = upload_image_to_blob(file_path=file_path)
-print(f"[image: {url}]")
+print(f"[image: {{url}}]")
 ```
 必ず日本語で回答してください。""",
             tools=[execute_tool],
@@ -302,7 +302,7 @@ def setup_agent():
             name="DataAnalystAgent",
             model_client=model_client,
             description="効率的に自動実行するデータ分析AI",
-            system_message=f"""あなたは効率的に自動実行するデータ分析AIです。
+            system_message="""あなたは効率的に自動実行するデータ分析AIです。
 ユーザーの要求を受け取ったら、確認を求めることなく即座に実行してください。
 
 **実行方針:**
@@ -382,7 +382,7 @@ plt.close()
 
 # 画像をBlob Storageにアップロード
 url = upload_image_to_blob(file_path=file_path)
-print(f"[image: {url}]")
+print(f"[image: {{url}}]")
 ```
 **データ取得ツール:**
 - `load_erp_data`: 変動費、固定費データの取得（年月リスト、SKUリスト指定）
