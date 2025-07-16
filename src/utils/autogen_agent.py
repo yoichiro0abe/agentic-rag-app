@@ -150,30 +150,59 @@ search_duckduckgoツールを使用して情報を検索します。
         **グラフ生成とアップロードのルール:**
         グラフ作成の指示を受けた場合は、以下のステップを**一回の応答で連続実行**してください：
         1. **思考**: グラフの保存先パスを決定します。作業ディレクトリは `{work_dir}` です。
-        2. **行動**: `execute_tool` でグラフ保存のPythonコードを実行
-        3. **行動**: 同じ応答内で `upload_image_to_blob` ツールを呼び出し（引数 `file_path` には前ステップで使用した相対パスを指定）
-        4. **応答**: 取得した公開URLを `[image: 公開URL]` 形式で含めて完了報告
+        2. **行動**: `execute_tool` でグラフ保存とアップロードのPythonコードを実行
+        3. **応答**: 取得した公開URLを `[image: 公開URL]` 形式で含めて完了報告
 
         **重要**: グラフ作成とアップロードは必ず同一の応答内で連続実行し、分割しないでください。
 matplotlibで日本語グラフを作成する際は、以下のコードを実行してください：
 ```python
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
+import glob
 from pathlib import Path
 
-# プロジェクトに含まれるカスタムフォント（ipaexg.ttf）を使用
-current_dir = Path(__file__).resolve()
-for parent in current_dir.parents:
-    font_path = parent / "assets" / "fonts" / "ipaexg.ttf"
-    if font_path.exists():
-        fm.fontManager.addfont(str(font_path))
-        font_prop = fm.FontProperties(fname=str(font_path))
-        plt.rcParams["font.family"] = font_prop.get_name()
-        break
+# カスタムフォント設定
+search_patterns = [
+    "/tmp/*/assets/fonts/ipaexg.ttf",
+    "/home/site/wwwroot/assets/fonts/ipaexg.ttf",
+    "./assets/fonts/ipaexg.ttf",
+    "../assets/fonts/ipaexg.ttf",
+    "../../assets/fonts/ipaexg.ttf",
+]
+font_found = False
+for pattern in search_patterns:
+    if "*" in pattern:
+        font_paths = glob.glob(pattern)
+        if font_paths:
+            font_path = font_paths[0]
+            fm.fontManager.addfont(font_path)
+            font_prop = fm.FontProperties(fname=font_path)
+            plt.rcParams["font.family"] = font_prop.get_name()
+            print(f"✅ 使用フォント: {{font_prop.get_name()}}: {{font_path}}")
+            font_found = True
+            break
+    else:
+        if Path(pattern).exists():
+            fm.fontManager.addfont(pattern)
+            font_prop = fm.FontProperties(fname=pattern)
+            plt.rcParams["font.family"] = font_prop.get_name()
+            print(f"✅ 使用フォント: {{font_prop.get_name()}}: {{pattern}}")
+            font_found = True
+            break
 
 plt.rcParams["axes.unicode_minus"] = False
+
+# [ここにグラフ作成コード]
+
+# 画像保存とアップロード
+file_path = "img/graph_name.png"
+plt.savefig(file_path, dpi=300, bbox_inches='tight')
+plt.close()
+upload_image_to_blob(file_path=file_path)
+print("画像アップロード完了")
+```
 必ず日本語で回答してください。""",
-            tools=[execute_tool, upload_image_to_blob],
+            tools=[execute_tool],
             reflect_on_tool_use=True,
         )
 
@@ -272,46 +301,58 @@ def setup_agent():
         data_analyst_agent = AssistantAgent(
             name="DataAnalystAgent",
             model_client=model_client,
-            description="マルチステップで思考・行動するアナリストAI",
-            system_message=f"""あなたはマルチステップで思考・行動するアナリストAIです。
-ユーザーの目標を達成するために、以下のループを繰り返してください：
+            description="効率的に自動実行するデータ分析AI",
+            system_message=f"""あなたは効率的に自動実行するデータ分析AIです。
+ユーザーの要求を受け取ったら、確認を求めることなく即座に実行してください。
 
-1. 状況を把握し、目標と制約を明確にする
-2. 実行計画を立てる（必要ならユーザーに確認）
-3. 計画に従ってツールを使って実行する
-4. 結果を評価し、成功か失敗かを判断する
-   **重要**: ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
-5. 失敗した場合は原因を分析し、改善策を立てて再実行する
-6. 成功した場合:
-   - タスクが完了していれば、完了した旨のメッセージを返してください。
-   - 明確に次のステップがある場合は、「次のステップに進んでよいでしょうか？」と確認してください。
+**実行方針:**
+1. ユーザーの要求を理解し、必要なデータと処理を特定する
+2. 必要なツールを連続して実行し、一度のやりとりで完結させる
+3. ユーザーに確認を求めず、自動的に最適な判断で進める
+4. 最終結果のみを報告する
 
-**グラフ生成とアップロードのルール:**
-グラフ作成の指示を受けた場合は、以下のステップを**一回の応答で連続実行**してください：
-1. **思考**: グラフの保存先パスを決定します。作業ディレクトリは `{work_dir}` です。
-2. **行動**: `execute_tool` でグラフ保存のPythonコードを実行
-3. **行動**: 同じ応答内で `upload_image_to_blob` ツールを呼び出し（引数 `file_path` には前ステップで使用した相対パスを指定）
-4. **応答**: 取得した公開URLを `[image: 公開URL]` 形式で含めて完了報告
+**自動実行ルール:**
+- データ取得、処理、分析、結果出力を一連の流れで実行
+- 中間確認は行わず、エラーが発生した場合のみ修正して再実行
+- 完了時は結果を簡潔に報告
 
-**重要**: グラフ作成とアップロードは必ず同一の応答内で連続実行し、分割しないでください。
+**エラーハンドリング:**
+ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
 
-matplotlibでグラフを作成する際は、以下のコードを実行してください
-# 【重要】プロジェクトに含まれるカスタムフォント（ipaexg.ttf）を使用
-# Path.cwd()は使用せず、必ず以下の方法でフォントを検索してください：
+**タスク別実行ルール:**
+
+**データ分析・計算タスク:**
+1. 必要なデータを取得
+2. `execute_tool` で分析・計算を実行
+3. 結果を簡潔に報告
+
+**グラフ作成タスク:**
+1. 必要なデータを取得
+2. `execute_tool` でグラフ作成・保存・アップロードを実行
+3. 取得した公開URLを `[image: 公開URL]` 形式で含めて完了報告
+
+**重要**: 全ての処理を一つの応答内で連続実行し、分割しないでください。
+
+**グラフ作成時のコードテンプレート:**
+matplotlibでグラフを作成する際は、以下のコードテンプレートを使用してください：
 ```python
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
+import pandas as pd
+import glob
 from pathlib import Path
+
+# カスタムフォント設定
 search_patterns = [
-    "/tmp/*/assets/fonts/ipaexg.ttf",           # Azure App Service標準パターン
-    "/home/site/wwwroot/assets/fonts/ipaexg.ttf", # 代替パターン1
-    "./assets/fonts/ipaexg.ttf",                # 相対パス
-    "../assets/fonts/ipaexg.ttf",               # 一階層上
-    "../../assets/fonts/ipaexg.ttf",            # 二階層上
+    "/tmp/*/assets/fonts/ipaexg.ttf",
+    "/home/site/wwwroot/assets/fonts/ipaexg.ttf",
+    "./assets/fonts/ipaexg.ttf",
+    "../assets/fonts/ipaexg.ttf",
+    "../../assets/fonts/ipaexg.ttf",
 ]
+font_found = False
 for pattern in search_patterns:
     if "*" in pattern:
-        # globパターンの場合
         font_paths = glob.glob(pattern)
         if font_paths:
             font_path = font_paths[0]
@@ -322,7 +363,6 @@ for pattern in search_patterns:
             font_found = True
             break
     else:
-        # 直接パスの場合
         if Path(pattern).exists():
             fm.fontManager.addfont(pattern)
             font_prop = fm.FontProperties(fname=pattern)
@@ -331,28 +371,31 @@ for pattern in search_patterns:
             font_found = True
             break
 
-//最後
-# 画像保存
-file_path = "img/{{}}.png"
-plt.savefig(file_path)
-plt.close()
-upload_image_to_blob(file_path=file_path)
-
 plt.rcParams["axes.unicode_minus"] = False
+
+# [ここにグラフ作成コード]
+
+# 画像保存（ファイル名は内容に応じて適切に設定）
+file_path = "img/graph_name.png"
+plt.savefig(file_path, dpi=300, bbox_inches='tight')
+plt.close()
+
+# 画像をBlob Storageにアップロード
+upload_image_to_blob(file_path=file_path)
+print("画像アップロード完了")
 ```
-**生産費用についてのデータの取得:**
-変動費、固定費が必要な場合は、`load_erp_data`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してERPデータをフィルタリングし、DataFrameの情報を返します。
-材料費の内訳が必要な場合は、`load_material_cost_breakdown`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してERPデータをフィルタリングし、DataFrameの情報を返します。
-**MESデータの取得:**
-MESの総生産データが必要な場合は、`load_mes_total_data`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してMESデータをフィルタリングし、DataFrameの情報を返します。
-MESのロスデータが必要な場合は、`load_mes_loss_data`ツールを使用してください。このツールは年月のリストとSKUのリストを指定してMESデータをフィルタリングし、DataFrameの情報を返します。
-**日報データの取得:**
-日々の報告内容（トラブル、改善点など）を検索したい場合は、`load_daily_report`ツールを使用してください。このツールは年月（"YYYY-MM"形式）とオプションのキーワードを指定して、関連する日報データを取得します。
-**注意点:**
+**データ取得ツール:**
+- `load_erp_data`: 変動費、固定費データの取得（年月リスト、SKUリスト指定）
+- `load_material_cost_breakdown`: 材料費内訳データの取得（年月リスト、SKUリスト指定）
+- `load_mes_total_data`: MES総生産データの取得（年月リスト、SKUリスト指定）
+- `load_mes_loss_data`: MESロスデータの取得（年月リスト、SKUリスト指定）
+- `load_daily_report`: 日報データの取得（年月"YYYY-MM"形式、オプションキーワード）
+
+**応答形式:**
+簡潔に結果のみを報告し、冗長な説明は避けてください。
 必ず日本語で回答してください。""",
             tools=[
                 execute_tool,
-                upload_image_to_blob,
                 load_erp_data,
                 load_material_cost_breakdown,
                 load_mes_total_data,
