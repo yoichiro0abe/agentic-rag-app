@@ -55,13 +55,16 @@ def main():
     # cacheにしたい
 
     def setup_font():
-        current_dir = Path(__file__).resolve()
-        for parent in current_dir.parents:
+        current_file = Path(__file__).resolve()
+        for parent in current_file.parents:
             font_path = parent / "assets" / "fonts" / "ipaexg.ttf"
             if font_path.exists():
                 fm.fontManager.addfont(str(font_path))
                 font_prop = fm.FontProperties(fname=str(font_path))
                 logger.info(f"Using font: {font_prop.get_name()}")
+                break  # フォントが見つかったらループを終了
+        else:
+            logger.warning("Font file not found in any parent directory")
 
     setup_font()
 
