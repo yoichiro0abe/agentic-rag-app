@@ -13,8 +13,6 @@ import asyncio
 
 # ローカルモジュールのインポート
 from .tools import (
-    get_work_directory,
-    upload_image_to_blob,
     search_duckduckgo,
     create_execute_tool,
     load_erp_data,
@@ -22,6 +20,7 @@ from .tools import (
     load_mes_total_data,
     load_mes_loss_data,
     load_daily_report,
+    upload_image_to_blob,
     timer,
 )
 
@@ -128,9 +127,6 @@ search_duckduckgoツールを使用して情報を検索します。
 
         execute_tool = create_execute_tool()
 
-        # 作業ディレクトリを取得してプロンプトに埋め込む
-        work_dir = get_work_directory()
-
         data_analyst_agent = AssistantAgent(
             name="DataAnalystAgent",
             model_client=model_client,
@@ -149,11 +145,12 @@ search_duckduckgoツールを使用して情報を検索します。
 データが見えない場合は、必要なデータをユーザに求めます。        **重要**: ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
         **グラフ生成とアップロードのルール:**
         グラフ作成の指示を受けた場合は、以下のステップを**一回の応答で連続実行**してください：
-        1. **思考**: グラフの保存先パスを決定します。作業ディレクトリは `{work_dir}` です。
+        1. **思考**: グラフの保存先パスを決定します。
         2. **行動**: `execute_tool` でグラフ保存とアップロードのPythonコードを実行
         3. **応答**: 取得した公開URLを `[image: 公開URL]` 形式で含めて完了報告
 
         **重要**: グラフ作成とアップロードは必ず同一の応答内で連続実行し、分割しないでください。
+        **重要**: `upload_image_to_blob`ツールが利用可能です。グラフ保存後に直接このツールを呼び出してください。
 matplotlibで日本語グラフを作成する際は、以下のコードを実行してください：
 ```python
 import matplotlib.pyplot as plt
@@ -202,7 +199,7 @@ url = upload_image_to_blob(file_path=file_path)
 print(f"[image: {{url}}]")
 ```
 必ず日本語で回答してください。""",
-            tools=[execute_tool],
+            tools=[execute_tool, upload_image_to_blob],
             reflect_on_tool_use=True,
         )
 
@@ -295,9 +292,6 @@ def setup_agent():
 
         execute_tool = create_execute_tool()
 
-        # 作業ディレクトリを取得してプロンプトに埋め込む
-        work_dir = get_work_directory()
-
         data_analyst_agent = AssistantAgent(
             name="DataAnalystAgent",
             model_client=model_client,
@@ -335,6 +329,7 @@ def setup_agent():
 
 **グラフ作成時のコードテンプレート:**
 matplotlibでグラフを作成する際は、以下のコードテンプレートを使用してください：
+**重要**: `upload_image_to_blob`ツールが利用可能です。グラフ保存後に直接このツールを呼び出してください。
 ```python
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
@@ -373,16 +368,10 @@ for pattern in search_patterns:
 
 plt.rcParams["axes.unicode_minus"] = False
 
-# [ここにグラフ作成コード]
-
-# 画像保存（ファイル名は内容に応じて適切に設定）
-file_path = "img/graph_name.png"
-plt.savefig(file_path, dpi=300, bbox_inches='tight')
-plt.close()
-
 # 画像をBlob Storageにアップロード
-url = upload_image_to_blob(file_path=file_path)
-print(f"[image: {{url}}]")
+# 注意：execute_toolではなく、upload_image_to_blobツールを直接使用してください
+# url = upload_image_to_blob(file_path=file_path)
+# print(f"[image: {{url}}]")
 ```
 **データ取得ツール:**
 - `load_erp_data`: 変動費、固定費データの取得（年月リスト、SKUリスト指定）
@@ -396,6 +385,7 @@ print(f"[image: {{url}}]")
 必ず日本語で回答してください。""",
             tools=[
                 execute_tool,
+                upload_image_to_blob,
                 load_erp_data,
                 load_material_cost_breakdown,
                 load_mes_total_data,
