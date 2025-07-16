@@ -146,15 +146,15 @@ search_duckduckgoツールを使用して情報を検索します。
 複雑な問題を小さなステップに分解します。
 コードを書く際は目的を明確にします。
 実行結果を詳細に分析し、次の行動につなげます。
-データが見えない場合は、必要なデータをユーザに求めます。
-**重要**: ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
-**グラフ生成とアップロードのルール:**
-1.  **思考**: グラフの保存先パスを決定します。作業ディレクトリは `{work_dir}` です。Pythonコード内でファイルを保存する際は、この作業ディレクトリからの相対パスを指定してください。（例: `'img/my_graph.png'`）。コード内で `{work_dir}` を含める必要はありません。
-2.  **行動 (コード実行)**: `execute_tool` を使い、決定した相対パスにグラフを保存するPythonコードを実行します。
-3.  **思考**: コード実行後、`upload_image_to_blob` ツールを呼び出して、保存した画像をアップロードする計画を立てます。
-4.  **行動 (ツール呼び出し)**: `upload_image_to_blob` ツールを呼び出します。引数 `file_path` には、ステップ2でコード内で使用した相対パスをそのまま指定します。
-5.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
-6.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
+データが見えない場合は、必要なデータをユーザに求めます。        **重要**: ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
+        **グラフ生成とアップロードのルール:**
+        グラフ作成の指示を受けた場合は、以下のステップを**一回の応答で連続実行**してください：
+        1. **思考**: グラフの保存先パスを決定します。作業ディレクトリは `{work_dir}` です。
+        2. **行動**: `execute_tool` でグラフ保存のPythonコードを実行
+        3. **行動**: 同じ応答内で `upload_image_to_blob` ツールを呼び出し（引数 `file_path` には前ステップで使用した相対パスを指定）
+        4. **応答**: 取得した公開URLを `[image: 公開URL]` 形式で含めて完了報告
+
+        **重要**: グラフ作成とアップロードは必ず同一の応答内で連続実行し、分割しないでください。
 matplotlibで日本語グラフを作成する際は、以下のコードを実行してください：
 ```python
 import matplotlib.pyplot as plt
@@ -287,12 +287,13 @@ def setup_agent():
    - 明確に次のステップがある場合は、「次のステップに進んでよいでしょうか？」と確認してください。
 
 **グラフ生成とアップロードのルール:**
-1.  **思考**: グラフの保存先パスを決定します。作業ディレクトリは `{work_dir}` です。Pythonコード内でファイルを保存する際は、この作業ディレクトリからの相対パスを指定してください。（例: `'img/my_graph.png'`）。コード内で `{work_dir}` を含める必要はありません。
-2.  **行動 (コード実行)**: `execute_tool` を使い、決定した相対パスにグラフを保存するPythonコードを実行します。
-3.  **思考**: コード実行後、`upload_image_to_blob` ツールを呼び出して、保存した画像をアップロードする計画を立てます。
-4.  **行動 (ツール呼び出し)**: `upload_image_to_blob` ツールを呼び出します。引数 `file_path` には、ステップ2でコード内で使用した相対パスをそのまま指定します。
-5.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
-6.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
+グラフ作成の指示を受けた場合は、以下のステップを**一回の応答で連続実行**してください：
+1. **思考**: グラフの保存先パスを決定します。作業ディレクトリは `{work_dir}` です。
+2. **行動**: `execute_tool` でグラフ保存のPythonコードを実行
+3. **行動**: 同じ応答内で `upload_image_to_blob` ツールを呼び出し（引数 `file_path` には前ステップで使用した相対パスを指定）
+4. **応答**: 取得した公開URLを `[image: 公開URL]` 形式で含めて完了報告
+
+**重要**: グラフ作成とアップロードは必ず同一の応答内で連続実行し、分割しないでください。
 
 matplotlibでグラフを作成する際は、以下のコードを実行してください
 # 【重要】プロジェクトに含まれるカスタムフォント（ipaexg.ttf）を使用
@@ -301,16 +302,41 @@ matplotlibでグラフを作成する際は、以下のコードを実行して�
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from pathlib import Path
-current_dir = Path(__file__).resolve()
-current_dir = [current_dir] + list(current_dir.parents)
-for parent in current_dir.parents:
-    font_path = parent / "assets" / "fonts" / "ipaexg.ttf"
-    if font_path.exists():
-        fm.fontManager.addfont(str(font_path))
-        font_prop = fm.FontProperties(fname=str(font_path))
-        plt.rcParams["font.family"] = font_prop.get_name()
-        print("✅ 使用フォント:", font_prop.get_name())
-        break
+search_patterns = [
+    "/tmp/*/assets/fonts/ipaexg.ttf",           # Azure App Service標準パターン
+    "/home/site/wwwroot/assets/fonts/ipaexg.ttf", # 代替パターン1
+    "./assets/fonts/ipaexg.ttf",                # 相対パス
+    "../assets/fonts/ipaexg.ttf",               # 一階層上
+    "../../assets/fonts/ipaexg.ttf",            # 二階層上
+]
+for pattern in search_patterns:
+    if "*" in pattern:
+        # globパターンの場合
+        font_paths = glob.glob(pattern)
+        if font_paths:
+            font_path = font_paths[0]
+            fm.fontManager.addfont(font_path)
+            font_prop = fm.FontProperties(fname=font_path)
+            plt.rcParams["font.family"] = font_prop.get_name()
+            print(f"✅ 使用フォント: {{font_prop.get_name()}}: {{font_path}}")
+            font_found = True
+            break
+    else:
+        # 直接パスの場合
+        if Path(pattern).exists():
+            fm.fontManager.addfont(pattern)
+            font_prop = fm.FontProperties(fname=pattern)
+            plt.rcParams["font.family"] = font_prop.get_name()
+            print(f"✅ 使用フォント: {{font_prop.get_name()}}: {{pattern}}")
+            font_found = True
+            break
+
+//最後
+# 画像保存
+file_path = "img/{{}}.png"
+plt.savefig(file_path)
+plt.close()
+upload_image_to_blob(file_path=file_path)
 
 plt.rcParams["axes.unicode_minus"] = False
 ```
