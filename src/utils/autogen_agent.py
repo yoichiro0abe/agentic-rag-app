@@ -309,6 +309,7 @@ for parent in current_dir.parents:
         fm.fontManager.addfont(str(font_path))
         font_prop = fm.FontProperties(fname=str(font_path))
         plt.rcParams["font.family"] = font_prop.get_name()
+        print("✅ 使用フォント:", font_prop.get_name())
         break
 
 plt.rcParams["axes.unicode_minus"] = False
