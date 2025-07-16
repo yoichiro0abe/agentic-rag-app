@@ -198,8 +198,8 @@ plt.rcParams["axes.unicode_minus"] = False
 file_path = "img/graph_name.png"
 plt.savefig(file_path, dpi=300, bbox_inches='tight')
 plt.close()
-upload_image_to_blob(file_path=file_path)
-print("画像アップロード完了")
+url = upload_image_to_blob(file_path=file_path)
+print(f"[image: {url}]")
 ```
 必ず日本語で回答してください。""",
             tools=[execute_tool],
@@ -381,8 +381,8 @@ plt.savefig(file_path, dpi=300, bbox_inches='tight')
 plt.close()
 
 # 画像をBlob Storageにアップロード
-upload_image_to_blob(file_path=file_path)
-print("画像アップロード完了")
+url = upload_image_to_blob(file_path=file_path)
+print(f"[image: {url}]")
 ```
 **データ取得ツール:**
 - `load_erp_data`: 変動費、固定費データの取得（年月リスト、SKUリスト指定）
