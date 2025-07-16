@@ -61,10 +61,12 @@ def main():
             if font_path.exists():
                 fm.fontManager.addfont(str(font_path))
                 font_prop = fm.FontProperties(fname=str(font_path))
-                logger.info(f"Using font: {font_prop.get_name()}")
+                logger.info(f"Using font: {font_prop.get_name()}: {font_path}")
                 break  # フォントが見つかったらループを終了
-        else:
-            logger.warning("Font file not found in any parent directory")
+            else:
+                logger.warning(
+                    f"Font file not found in any parent directory:{font_path}"
+                )
 
     setup_font()
 
