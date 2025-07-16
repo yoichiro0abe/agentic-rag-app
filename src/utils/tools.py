@@ -182,7 +182,7 @@ def upload_image_to_blob(file_path: str) -> str:
         except Exception as e:
             logger.warning(f"ローカルファイルの削除に失敗しました {path_to_use}: {e}")
 
-        return f"画像のアップロードに成功しました。URL: {url}"
+        return f"画像のアップロードに成功しました。[image: {url}]"
 
     except Exception as e:
         logger.error(f"Azure Blob Storageへのファイルアップロードに失敗しました: {e}")

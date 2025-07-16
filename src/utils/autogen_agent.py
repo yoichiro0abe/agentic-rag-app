@@ -131,76 +131,198 @@ search_duckduckgoツールを使用して情報を検索します。
             name="DataAnalystAgent",
             model_client=model_client,
             description="データ分析を行うエージェント",
-            system_message="""あなたはデータ分析エージェントです。ReActフレームワーク（推論と行動）を使用してタスクを実行します。
+            system_message="""あなたはデータ分析エージェントです。ユーザーの要求を受け取ったら、確認を求めることなく必要な処理をすべて一度の応答で完了してください。
 
-各ターンで以下の形式に従ってください：
-思考: [問題の分析、解決へのアプローチ]
-行動: execute_tool([Pythonコード])
-観察: [コード実行の結果]
-思考: [結果の解釈と次のステップ]
+**最重要ルール - 絶対に分割しない:**
+- データ取得、グラフ作成、アップロードをすべて一つの応答で実行
+- ツール間で応答を分けない
+- 「つづけて」と言われる前にすべて完了させる
 
-複雑な問題を小さなステップに分解します。
-コードを書く際は目的を明確にします。
-実行結果を詳細に分析し、次の行動につなげます。
-データが見えない場合は、必要なデータをユーザに求めます。        **重要**: ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
-        **グラフ生成とアップロードのルール:**
-        グラフ作成の指示を受けた場合は、以下のステップを**一回の応答で連続実行**してください：
-        1. **思考**: グラフの保存先パスを決定します。
-        2. **行動**: `execute_tool` でグラフ保存とアップロードのPythonコードを実行
-        3. **応答**: 取得した公開URLを `[image: 公開URL]` 形式で含めて完了報告
+**グラフ作成の完全手順（必ず一つの応答で実行）:**
+1. データ取得ツール実行
+2. execute_toolでグラフ作成・保存
+3. upload_image_to_blobでアップロード
+4. 最終結果報告
 
-        **重要**: グラフ作成とアップロードは必ず同一の応答内で連続実行し、分割しないでください。
-        **重要**: `upload_image_to_blob`ツールが利用可能です。グラフ保存後に直接このツールを呼び出してください。
-matplotlibで日本語グラフを作成する際は、以下のコードを実行してください：
+**重要**: 中間で応答を返さず、すべての処理を連続実行してください。
+
+**クロスプラットフォーム対応グラフ作成テンプレート:**
 ```python
+import matplotlib.pyplot as plt
+import matplotlib.font_manager as fm
+import pandas as pd
+import glob
+import os
+from pathlib import Path
+from datetime import datetime
+from io import StringIO
+
+# カスタムフォント設定（Azure App Service含む）
+search_patterns = [
+    "./assets/fonts/ipaexg.ttf",
+    "../assets/fonts/ipaexg.ttf",
+    "../../assets/fonts/ipaexg.ttf",
+    "/home/site/wwwroot/assets/fonts/ipaexg.ttf",  # Azure App Service
+]
+
+font_found = False
+# Linux/Unix環境のみワイルドカード検索を追加
+if os.name == 'posix':  # Linux/Unix (Azure App Service含む)
+    search_patterns.extend([
+        "/tmp/*/assets/fonts/ipaexg.ttf",  # Azure App Service環境
+        "/home/*/projects/*/assets/fonts/ipaexg.ttf",
+        "/opt/*/assets/fonts/ipaexg.ttf"
+    ])
+
+# フォント検索（Linux/Unix環境）
+if os.name == 'posix':
+    for pattern in search_patterns:
+        if "*" in pattern:
+            font_paths = glob.glob(pattern, recursive=True)
+            if font_paths:
+                font_path = font_paths[0]
+                fm.fontManager.addfont(font_path)
+                font_prop = fm.FontProperties(fname=font_path)
+                plt.rcParams["font.family"] = font_prop.get_name()
+                print(f"✅ 使用フォント: {font_prop.get_name()}: {font_path}")
+                font_found = True
+                break
+        else:
+            if Path(pattern).exists():
+                fm.fontManager.addfont(pattern)
+                font_prop = fm.FontProperties(fname=pattern)
+                plt.rcParams["font.family"] = font_prop.get_name()
+                print(f"✅ 使用フォント: {font_prop.get_name()}: {pattern}")
+                font_found = True
+                break
+
+# Windows環境ではシステムフォントを使用
+if os.name == 'nt':  # Windows
+    plt.rcParams["font.family"] = ["Yu Gothic", "Meiryo", "MS Gothic", "sans-serif"]
+    print("✅ Windowsシステムフォントを使用します")
+    font_found = True
+
+if not font_found:
+    print("⚠️ カスタムフォントが見つかりません。デフォルトフォントを使用します。")
+
+plt.rcParams["axes.unicode_minus"] = False
+
+# データ処理とグラフ作成
+# [ここにデータ処理コード]
+
+# ファイル保存（クロスプラットフォーム対応）
+timestamp = datetime.now().strftime("%Y_%m_%d_%H%M%S")
+if os.name == 'nt':  # Windows
+    work_dir = os.path.abspath("work")
+    img_dir = os.path.join(work_dir, "img")
+    os.makedirs(img_dir, exist_ok=True)
+    file_path = os.path.join(img_dir, f"graph_{timestamp}.png")
+else:  # Linux/Unix (Azure App Service)
+    file_path = f"/tmp/graph_{timestamp}.png"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+plt.savefig(file_path, dpi=300, bbox_inches='tight')
+plt.close()
+print(f"✅ グラフを保存しました: {os.path.abspath(file_path)}")
+```
+
+**CSVデータ処理時の注意点:**
+- load_erp_dataの結果はCSV文字列なので、pd.read_csv(StringIO(csv_data))で処理
+- 先頭にUnnamed列がある場合は削除: df = df.drop(columns=[col for col in df.columns if col.startswith('Unnamed')])
+- データ型エラーを避けるため、文字列として処理してから数値変換
+
+**利用可能なデータ取得ツール:**
+- `load_erp_data`: 変動費、固定費データの取得（年月リスト、SKUリスト指定）
+  例: load_erp_data(year_months=["2025-01", "2025-02"], skus=["SKU-1234"])
+- `load_material_cost_breakdown`: 材料費内訳データの取得（年月リスト、SKUリスト指定）
+  例: load_material_cost_breakdown(year_months=["2025-01"], skus=["SKU-1234"])
+- `load_mes_total_data`: MES総生産データの取得（年月リスト、SKUリスト指定）
+  例: load_mes_total_data(year_months=["2025-01"], skus=["SKU-1234"])
+- `load_mes_loss_data`: MESロスデータの取得（年月リスト、SKUリスト指定）
+  例: load_mes_loss_data(year_months=["2025-01"], skus=["SKU-1234"])
+- `load_daily_report`: 日報データの取得（年月"YYYY-MM"形式、オプションキーワード）
+  例: load_daily_report(year_month="2025-01", keyword="品質")
+
+**エラー回避のためのベストプラクティス:**
+1. クロスプラットフォーム対応パス処理: Windows用とLinux用で分岐
+2. フォント設定: Windows=システムフォント、Linux=IPAフォント検索
+3. ファイル保存前にディレクトリ確認
+4. CSVデータは必ずStringIOで処理
+5. 数値データは適切な型変換を実行
+
+**完全なクロスプラットフォーム対応手順:**
+```python
+# 1. データ取得
+data = load_xxx_data(...)
+
+# 2. データ処理
+df = pd.read_csv(StringIO(data))
+df = df.drop(columns=[col for col in df.columns if col.startswith('Unnamed')])
+
+# 3. クロスプラットフォーム対応フォント設定
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import glob
 from pathlib import Path
 
-# カスタムフォント設定
-search_patterns = [
-    "/tmp/*/assets/fonts/ipaexg.ttf",
-    "/home/site/wwwroot/assets/fonts/ipaexg.ttf",
-    "./assets/fonts/ipaexg.ttf",
-    "../assets/fonts/ipaexg.ttf",
-    "../../assets/fonts/ipaexg.ttf",
-]
-font_found = False
-for pattern in search_patterns:
-    if "*" in pattern:
-        font_paths = glob.glob(pattern)
-        if font_paths:
-            font_path = font_paths[0]
-            fm.fontManager.addfont(font_path)
-            font_prop = fm.FontProperties(fname=font_path)
-            plt.rcParams["font.family"] = font_prop.get_name()
-            print(f"✅ 使用フォント: {{font_prop.get_name()}}: {{font_path}}")
-            font_found = True
-            break
-    else:
-        if Path(pattern).exists():
+if os.name == 'posix':  # Linux/Unix (Azure App Service)
+    # カスタムフォント検索
+    search_patterns = [
+        "./assets/fonts/ipaexg.ttf",
+        "../assets/fonts/ipaexg.ttf",
+        "/home/site/wwwroot/assets/fonts/ipaexg.ttf",
+        "/tmp/*/assets/fonts/ipaexg.ttf"
+    ]
+    font_found = False
+    for pattern in search_patterns:
+        if "*" in pattern:
+            font_paths = glob.glob(pattern, recursive=True)
+            if font_paths:
+                fm.fontManager.addfont(font_paths[0])
+                font_prop = fm.FontProperties(fname=font_paths[0])
+                plt.rcParams["font.family"] = font_prop.get_name()
+                font_found = True
+                break
+        elif Path(pattern).exists():
             fm.fontManager.addfont(pattern)
             font_prop = fm.FontProperties(fname=pattern)
             plt.rcParams["font.family"] = font_prop.get_name()
-            print(f"✅ 使用フォント: {{font_prop.get_name()}}: {{pattern}}")
             font_found = True
             break
+    if not font_found:
+        print("⚠️ カスタムフォントが見つかりません")
+else:  # Windows
+    plt.rcParams["font.family"] = ["Yu Gothic", "Meiryo", "MS Gothic", "sans-serif"]
 
 plt.rcParams["axes.unicode_minus"] = False
 
-# [ここにグラフ作成コード]
+# 4. グラフ作成
+plt.figure(figsize=(10, 6))
+# [グラフ描画コード]
 
-# 画像保存とアップロード
-file_path = "img/graph_name.png"
+# 5. クロスプラットフォーム対応ファイル保存
+timestamp = datetime.now().strftime("%Y_%m_%d_%H%M%S")
+if os.name == 'nt':  # Windows
+    work_dir = os.path.abspath("work")
+    img_dir = os.path.join(work_dir, "img")
+    os.makedirs(img_dir, exist_ok=True)
+    file_path = os.path.join(img_dir, f"graph_{timestamp}.png")
+else:  # Linux/Unix (Azure App Service)
+    file_path = f"/tmp/graph_{timestamp}.png"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
 plt.savefig(file_path, dpi=300, bbox_inches='tight')
 plt.close()
+
+# 6. Blobアップロード
 url = upload_image_to_blob(file_path=file_path)
-print(f"[image: {{url}}]")
+print(f"[image: {url}]")
 ```
+
 必ず日本語で回答してください。""",
             tools=[execute_tool, upload_image_to_blob],
-            reflect_on_tool_use=True,
+            reflect_on_tool_use=False,  # 連続実行を可能にするため無効化
+            max_tool_iterations=10,  # 複数ツールの連続実行を許可
         )
 
         selector_prompt = """会話の状況に応じて次のタスクを実行する role を選択することです。
@@ -297,91 +419,105 @@ def setup_agent():
             model_client=model_client,
             description="効率的に自動実行するデータ分析AI",
             system_message="""あなたは効率的に自動実行するデータ分析AIです。
-ユーザーの要求を受け取ったら、確認を求めることなく即座に実行してください。
+ユーザーの要求を受け取ったら、確認を求めることなく即座にすべてを実行してください。
 
-**実行方針:**
-1. ユーザーの要求を理解し、必要なデータと処理を特定する
-2. 必要なツールを連続して実行し、一度のやりとりで完結させる
-3. ユーザーに確認を求めず、自動的に最適な判断で進める
-4. 最終結果のみを報告する
+**最重要ルール:**
+絶対に処理を分割せず、一つの応答ですべて完了させる
 
-**自動実行ルール:**
-- データ取得、処理、分析、結果出力を一連の流れで実行
-- 中間確認は行わず、エラーが発生した場合のみ修正して再実行
-- 完了時は結果を簡潔に報告
+**グラフ作成の場合:**
+1. データ取得ツール実行
+2. execute_toolでグラフ作成・保存
+3. upload_image_to_blobでアップロードし、実行結果から、画像の公開URLを取得します。
+4. 結果報告(応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に記載してください)
 
-**エラーハンドリング:**
-ツール実行結果の `is_error` が `True` の場合は、コードが失敗しています。その原因を分析し、コードを修正して再実行してください。成功と誤認してはいけません。
+**重要:** 中間で応答を返さず、すべてのツールを連続実行してください。
 
-**タスク別実行ルール:**
 
-**データ分析・計算タスク:**
-1. 必要なデータを取得
-2. `execute_tool` で分析・計算を実行
-3. 結果を簡潔に報告
-
-**グラフ作成タスク:**
-1. 必要なデータを取得
-2. `execute_tool` でグラフ作成・保存・アップロードを実行
-3. 取得した公開URLを `[image: 公開URL]` 形式で含めて完了報告
-
-**重要**: 全ての処理を一つの応答内で連続実行し、分割しないでください。
-
-**グラフ作成時のコードテンプレート:**
-matplotlibでグラフを作成する際は、以下のコードテンプレートを使用してください：
-**重要**: `upload_image_to_blob`ツールが利用可能です。グラフ保存後に直接このツールを呼び出してください。
+**クロスプラットフォーム対応グラフ作成テンプレート:**
 ```python
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 import pandas as pd
 import glob
+import os
 from pathlib import Path
+from datetime import datetime
+from io import StringIO
 
-# カスタムフォント設定
-search_patterns = [
-    "/tmp/*/assets/fonts/ipaexg.ttf",
-    "/home/site/wwwroot/assets/fonts/ipaexg.ttf",
-    "./assets/fonts/ipaexg.ttf",
-    "../assets/fonts/ipaexg.ttf",
-    "../../assets/fonts/ipaexg.ttf",
-]
-font_found = False
-for pattern in search_patterns:
-    if "*" in pattern:
-        font_paths = glob.glob(pattern)
-        if font_paths:
-            font_path = font_paths[0]
-            fm.fontManager.addfont(font_path)
-            font_prop = fm.FontProperties(fname=font_path)
-            plt.rcParams["font.family"] = font_prop.get_name()
-            print(f"✅ 使用フォント: {{font_prop.get_name()}}: {{font_path}}")
-            font_found = True
-            break
-    else:
-        if Path(pattern).exists():
+# クロスプラットフォーム対応フォント設定
+if os.name == 'posix':  # Linux/Unix (Azure App Service)
+    # カスタムフォント検索
+    search_patterns = [
+        "./assets/fonts/ipaexg.ttf",
+        "../assets/fonts/ipaexg.ttf",
+        "../../assets/fonts/ipaexg.ttf",
+        "/home/site/wwwroot/assets/fonts/ipaexg.ttf",
+        "/tmp/*/assets/fonts/ipaexg.ttf"
+    ]
+    font_found = False
+    for pattern in search_patterns:
+        if "*" in pattern:
+            font_paths = glob.glob(pattern, recursive=True)
+            if font_paths:
+                fm.fontManager.addfont(font_paths[0])
+                font_prop = fm.FontProperties(fname=font_paths[0])
+                plt.rcParams["font.family"] = font_prop.get_name()
+                print(f"✅ 使用フォント: {font_prop.get_name()}")
+                font_found = True
+                break
+        elif Path(pattern).exists():
             fm.fontManager.addfont(pattern)
             font_prop = fm.FontProperties(fname=pattern)
             plt.rcParams["font.family"] = font_prop.get_name()
-            print(f"✅ 使用フォント: {{font_prop.get_name()}}: {{pattern}}")
+            print(f"✅ 使用フォント: {font_prop.get_name()}")
             font_found = True
             break
+    if not font_found:
+        print("⚠️ カスタムフォントが見つかりません")
+else:  # Windows
+    plt.rcParams["font.family"] = ["Yu Gothic", "Meiryo", "MS Gothic", "sans-serif"]
+    print("✅ Windowsシステムフォントを使用します")
 
 plt.rcParams["axes.unicode_minus"] = False
 
-# 画像をBlob Storageにアップロード
-# 注意：execute_toolではなく、upload_image_to_blobツールを直接使用してください
-# url = upload_image_to_blob(file_path=file_path)
-# print(f"[image: {{url}}]")
-```
-**データ取得ツール:**
-- `load_erp_data`: 変動費、固定費データの取得（年月リスト、SKUリスト指定）
-- `load_material_cost_breakdown`: 材料費内訳データの取得（年月リスト、SKUリスト指定）
-- `load_mes_total_data`: MES総生産データの取得（年月リスト、SKUリスト指定）
-- `load_mes_loss_data`: MESロスデータの取得（年月リスト、SKUリスト指定）
-- `load_daily_report`: 日報データの取得（年月"YYYY-MM"形式、オプションキーワード）
+# データ処理
+# [ここにデータ処理コード]
 
-**応答形式:**
-簡潔に結果のみを報告し、冗長な説明は避けてください。
+# クロスプラットフォーム対応ファイル保存
+file_uuid = uuid.uuid4()
+if os.name == 'nt':  # Windows
+    work_dir = os.path.abspath("work")
+    img_dir = os.path.join(work_dir, "img")
+    os.makedirs(img_dir, exist_ok=True)
+    file_path = os.path.join(img_dir, f"graph_{file_uuid}.png")
+else:  # Linux/Unix (Azure App Service)
+    file_path = f"/tmp/graph_{file_uuid}.png"
+    os.makedirs(os.path.dirname(file_path), exist_ok=True)
+
+plt.savefig(file_path, dpi=300, bbox_inches='tight')
+plt.close()
+print(f"✅ グラフ保存: {os.path.abspath(file_path)}")
+
+```
+
+**利用可能なデータ取得ツール:**
+- `load_erp_data`: 変動費、固定費データの取得（年月リスト、SKUリスト指定）
+  例: load_erp_data(year_months=["2025-01", "2025-02"], skus=["SKU-1234"])
+- `load_material_cost_breakdown`: 材料費内訳データの取得（年月リスト、SKUリスト指定）
+  例: load_material_cost_breakdown(year_months=["2025-01"], skus=["SKU-1234"])
+- `load_mes_total_data`: MES総生産データの取得（年月リスト、SKUリスト指定）
+  例: load_mes_total_data(year_months=["2025-01"], skus=["SKU-1234"])
+- `load_mes_loss_data`: MESロスデータの取得（年月リスト、SKUリスト指定）
+  例: load_mes_loss_data(year_months=["2025-01"], skus=["SKU-1234"])
+- `load_daily_report`: 日報データの取得（年月"YYYY-MM"形式、オプションキーワード）
+  例: load_daily_report(year_month="2025-01", keyword="品質")
+
+**エラー回避のポイント:**
+- クロスプラットフォーム対応: Windows/Linux両対応
+- フォント設定: 環境別に最適化
+- CSVデータはStringIOで処理
+- ファイル保存前にディレクトリ確認
+
 必ず日本語で回答してください。""",
             tools=[
                 execute_tool,
@@ -392,7 +528,8 @@ plt.rcParams["axes.unicode_minus"] = False
                 load_mes_loss_data,
                 load_daily_report,
             ],
-            reflect_on_tool_use=True,
+            reflect_on_tool_use=False,  # 連続実行を可能にするため無効化
+            max_tool_iterations=10,  # 複数ツールの連続実行を許可
         )
 
         return data_analyst_agent
