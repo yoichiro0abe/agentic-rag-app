@@ -294,14 +294,15 @@ def setup_agent():
 5.  **観察**: アップロードツールの実行結果から、画像の公開URLを取得します。
 6.  **応答**: 応答メッセージに、取得した公開URLを `[image: 公開URL]` の形式で正確に含めてください。
 
-matplotlibでグラフを作成する際は、以下のコードを実行してください：
+matplotlibでグラフを作成する際は、以下のコードを実行してください
+# 【重要】プロジェクトに含まれるカスタムフォント（ipaexg.ttf）を使用
+# Path.cwd()は使用せず、必ず以下の方法でフォントを検索してください：
 ```python
 import matplotlib.pyplot as plt
 import matplotlib.font_manager as fm
 from pathlib import Path
-
-# プロジェクトに含まれるカスタムフォント（ipaexg.ttf）を使用
 current_dir = Path(__file__).resolve()
+current_dir = [current_dir] + list(current_dir.parents)
 for parent in current_dir.parents:
     font_path = parent / "assets" / "fonts" / "ipaexg.ttf"
     if font_path.exists():
