@@ -56,7 +56,7 @@ def display_message_with_images(content: str):
             image_path = part.strip()
             # URLかローカルパスかを判定
             if image_path.startswith("http"):
-                st.image(image_path)
+                st.image(image_path, width=300)  # URLの場合は直接表示
             elif os.path.exists(image_path):
                 st.image(image_path)
             else:
