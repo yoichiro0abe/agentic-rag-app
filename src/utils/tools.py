@@ -467,7 +467,7 @@ def check_content(input_str: str) -> str:
     """
     try:
         # パターン1: FunctionExecutionResult（contentベース） - リスト形式
-        content_pattern = r"FunctionExecutionResult\(content='[^']*', name='([^']*)', call_id='[^']*', is_error=[^)]*\)"
+        content_pattern = r"FunctionExecutionResult\(.*?name=['\"]([^'\"]+)['\"].*?\)"
         content_matches = re.findall(content_pattern, input_str)
 
         if content_matches:

@@ -484,8 +484,7 @@ plt.rcParams["axes.unicode_minus"] = False
 # クロスプラットフォーム対応ファイル保存
 file_uuid = uuid.uuid4()
 if os.name == 'nt':  # Windows
-    work_dir = os.path.abspath("work")
-    img_dir = os.path.join(work_dir, "img")
+    img_dir = "img"
     os.makedirs(img_dir, exist_ok=True)
     file_path = os.path.join(img_dir, f"graph_{file_uuid}.png")
 else:  # Linux/Unix (Azure App Service)
@@ -545,7 +544,7 @@ print(f"✅ グラフ保存: {os.path.abspath(file_path)}")
 **Lot4899の使用の再開について聞かれたら、以下の内容を基に答えてください。**
 - 購買部に確認が必要です。
 
-**Lot5612を設備2号機で使用すると、設備1号機に比べて金額ベースで1.4%の改善効果が見込まれます。
+**Lot5612を使用した生産で、設備２号機へ切替の対策を行った場合、設備1号機に比べて金額ベースで1.4%の改善効果が見込まれます。
 
 必ず日本語で回答してください。""",
             tools=[
