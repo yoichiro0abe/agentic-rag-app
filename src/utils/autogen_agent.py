@@ -131,20 +131,14 @@ search_duckduckgoツールを使用して情報を検索します。
             name="DataAnalystAgent",
             model_client=model_client,
             description="データ分析を行うエージェント",
-            system_message="""あなたはデータ分析エージェントです。ユーザーの要求を受け取ったら、確認を求めることなく必要な処理をすべて一度の応答で完了してください。
+            system_message="""あなたはデータ分析エージェントです。
 
-**最重要ルール - 絶対に分割しない:**
-- データ取得、グラフ作成、アップロードをすべて一つの応答で実行
-- ツール間で応答を分けない
-- 「つづけて」と言われる前にすべて完了させる
-
-**グラフ作成の完全手順（必ず一つの応答で実行）:**
+**グラフ作成の完全手順:**
 1. データ取得ツール実行
 2. execute_toolでグラフ作成・保存
 3. upload_image_to_blobでアップロード
 4. 最終結果報告
 
-**重要**: 中間で応答を返さず、すべての処理を連続実行してください。
 
 **クロスプラットフォーム対応グラフ作成テンプレート:**
 ```python
@@ -226,22 +220,12 @@ plt.close()
 print(f"✅ グラフを保存しました: {os.path.abspath(file_path)}")
 ```
 
-**CSVデータ処理時の注意点:**
-- load_erp_dataの結果はCSV文字列なので、pd.read_csv(StringIO(csv_data))で処理
-- 先頭にUnnamed列がある場合は削除: df = df.drop(columns=[col for col in df.columns if col.startswith('Unnamed')])
-- データ型エラーを避けるため、文字列として処理してから数値変換
 
 **利用可能なデータ取得ツール:**
-- `load_erp_data`: 変動費、固定費データの取得（年月リスト、SKUリスト指定）
-  例: load_erp_data(year_months=["2025-01", "2025-02"], skus=["SKU-1234"])
-- `load_material_cost_breakdown`: 材料費内訳データの取得（年月リスト、SKUリスト指定）
-  例: load_material_cost_breakdown(year_months=["2025-01"], skus=["SKU-1234"])
 - `load_mes_total_data`: MES総生産データの取得（年月リスト、SKUリスト指定）
   例: load_mes_total_data(year_months=["2025-01"], skus=["SKU-1234"])
 - `load_mes_loss_data`: MESロスデータの取得（年月リスト、SKUリスト指定）
   例: load_mes_loss_data(year_months=["2025-01"], skus=["SKU-1234"])
-- `load_daily_report`: 日報データの取得（年月"YYYY-MM"形式、オプションキーワード）
-  例: load_daily_report(year_month="2025-01", keyword="品質")
 
 **エラー回避のためのベストプラクティス:**
 1. クロスプラットフォーム対応パス処理: Windows用とLinux用で分岐
@@ -296,10 +280,6 @@ else:  # Windows
 
 plt.rcParams["axes.unicode_minus"] = False
 
-# 4. グラフ作成
-plt.figure(figsize=(10, 6))
-# [グラフ描画コード]
-
 # 5. クロスプラットフォーム対応ファイル保存
 timestamp = datetime.now().strftime("%Y_%m_%d_%H%M%S")
 if os.name == 'nt':  # Windows
@@ -314,10 +294,6 @@ else:  # Linux/Unix (Azure App Service)
 plt.savefig(file_path, dpi=300, bbox_inches='tight')
 plt.close()
 
-# 6. Blobアップロード
-url = upload_image_to_blob(file_path=file_path)
-print(f"[image: {url}]")
-```
 
 必ず日本語で回答してください。""",
             tools=[execute_tool, upload_image_to_blob],

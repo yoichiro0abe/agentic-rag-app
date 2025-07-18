@@ -10,6 +10,7 @@ from typing import List, Optional
 import re
 import functools
 import time
+import streamlit as st
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -486,3 +487,16 @@ def check_content(input_str: str) -> str:
         logger.error(f"check_contentのエラー: {str(e)}")
         return None
     return None
+
+
+def display_multiagent_chat_message(message, index):
+    """
+    マルチエージェントのチャットメッセージを表示する関数。
+
+    Args:
+        message (TextMessage): 表示するメッセージオブジェクト。
+        index (int): メッセージのインデックス。
+    """
+    role = "🤖 エージェント" if message.source != "user" else "👤 ユーザー"
+    st.markdown(f"**{role} ({index + 1}):**")
+    st.markdown(f"> {message.content}")
