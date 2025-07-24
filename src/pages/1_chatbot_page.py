@@ -149,7 +149,7 @@ def enhanced_chatbot_page():
         )
         st.session_state.data_manager = DataManager(DATA_DIR)
 
-    st.header("🤖 チャットボット")
+    st.header("🤖 分析ボット")
 
     # ヘッダー部分にボタンを配置
     col1, col2, col3 = st.columns([2, 1, 1])

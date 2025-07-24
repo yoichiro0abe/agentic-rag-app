@@ -24,7 +24,7 @@ def start_new_analysis_chat():
 
 def enhanced_analysis_bot_page():
     """拡張された分析ボット画面（対話形式）"""
-    st.header("🤖 マルチエージェント分析")
+    st.header("🤖 シミュレーションボット")
 
     # --- セッション状態の初期化 ---
     if "analysis_messages" not in st.session_state:
@@ -163,7 +163,11 @@ P2からP18の生産時間は、プロンプトに記載された時間（P2: 10
                         )
                         await asyncio.sleep(0.1)
 
-                asyncio.run(stream_response())
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                loop.run_until_complete(stream_response())
+            except asyncio.CancelledError:
+                logger.info("分析タスクがキャンセルされました。")
             except Exception as e:
                 error_message = f"分析中にエラーが発生しました: {str(e)}"
                 logger.error(error_message)

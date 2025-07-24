@@ -33,7 +33,7 @@ from common import (
 
 # ページ設定
 st.set_page_config(
-    page_title="チャットボットアプリ",
+    page_title="マルチエージェント分析",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -125,12 +125,14 @@ def main():
         pages_dir = os.path.join(current_dir, "pages")
         chatbot_page = st.Page(
             os.path.join(pages_dir, "1_chatbot_page.py"),
-            title="チャットボット",
+            title="分析ボット",
             icon="🤖",
             default=True,
         )
         analysis_page = st.Page(
-            os.path.join(pages_dir, "2_analysis_page.py"), title="分析ボット", icon="📊"
+            os.path.join(pages_dir, "2_analysis_page.py"),
+            title="シミュレーションボット",
+            icon="📊",
         )
         chat_history_page = st.Page(
             os.path.join(pages_dir, "3_chat_history_page.py"),
