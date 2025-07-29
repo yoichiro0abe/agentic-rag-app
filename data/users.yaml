@@ -24,6 +24,10 @@ credentials:
       email: nakamura@example.com
       name: ユーザー
       password: $2b$12$NeQ1XUDrBO1oxBWq2VHHpOwWFpJjgPhj5ph9t7DUWrJN2G8jwt9TC
+    kamiguchi:
+      email: kamiguchi@example.com
+      name: ユーザー
+      password: $2b$12$NeQ1XUDrBO1oxBWq2VHHpOwWFpJjgPhj5ph9t7DUWrJN2G8jwt9TC
 preauthorized:
   emails:
   - admin@example.com

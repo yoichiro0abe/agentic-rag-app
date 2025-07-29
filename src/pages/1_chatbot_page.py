@@ -29,7 +29,7 @@ def display_custom_chat_message(role: str, content: str):
     # ユーザーの場合のみカスタム画像を使用、その他は元のままの表示
     if role == "user":
         # ユーザーのみ花王のマークを使用
-        with st.chat_message(role, avatar="demo_kao.jpeg"):
+        with st.chat_message(role, avatar="user.png"):
             display_message_with_images(content)
     else:
         type_of_content = check_content(content)
@@ -38,7 +38,7 @@ def display_custom_chat_message(role: str, content: str):
             with st.expander("📋 Agent呼び出しの詳細", expanded=False):
                 st.write(content)
         else:
-            with st.chat_message(role, avatar="avanade.png"):
+            with st.chat_message(role, avatar="system.png"):
                 display_message_with_images(content)
 
 
